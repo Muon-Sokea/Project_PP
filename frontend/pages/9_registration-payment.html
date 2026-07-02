@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Planning Center — Event Registration</title>
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="/assets/css/1_global.css" />
+  <link rel="stylesheet" href="/assets/css/2_navbar.css" />
+  <style>
+    .reg-page{max-width:720px;margin:0 auto;padding:32px 24px}
+    .reg-title{text-align:center;margin-bottom:4px}
+    .reg-sub{text-align:center;color:var(--text-light);font-size:14px;margin-bottom:28px}
+    .form-section{background:var(--bg-white);border:1px solid var(--border);border-radius:var(--border-radius-lg);padding:20px 24px;margin-bottom:16px}
+    .form-section-title{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:var(--text-dark);margin-bottom:16px}
+    .form-section-title i{font-size:18px;color:var(--primary)}
+    .form-row{display:flex;gap:16px}
+    .form-row .form-group{flex:1}
+    .order-summary{background:var(--bg-white);border:1px solid var(--border);border-radius:var(--border-radius-lg);padding:20px 24px;margin-bottom:24px}
+    .order-row{display:flex;justify-content:space-between;font-size:14px;padding:6px 0;color:var(--text-medium)}
+    .order-total{display:flex;justify-content:space-between;font-size:16px;font-weight:700;padding-top:12px;border-top:1px solid var(--border);margin-top:8px}
+    .order-total span:last-child{color:var(--primary)}
+    .form-actions{display:flex;gap:12px;justify-content:space-between}
+    .ticket-option{border:2px solid var(--border);border-radius:var(--border-radius);padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:border-color .2s,background .2s;display:flex;justify-content:space-between;align-items:flex-start;background:var(--bg-white)}
+    .ticket-option:hover{border-color:var(--primary-border)}
+    .ticket-option.selected{border-color:var(--primary);background:var(--primary-light)}
+    .ticket-option .t-name{font-weight:600;font-size:14px;color:var(--text-dark);margin-bottom:2px}
+    .ticket-option .t-desc{font-size:13px;color:var(--text-light)}
+    .ticket-option .t-price{font-weight:700;font-size:16px;color:var(--text-dark);white-space:nowrap}
+    .qty-row{display:flex;align-items:center;gap:14px;margin-top:6px}
+    .qty-row .q-label{font-size:14px;font-weight:600;color:var(--text-medium)}
+    .qty-controls{display:flex;align-items:center;gap:8px}
+    .qty-btn{width:34px;height:34px;border:1px solid var(--border);background:var(--bg-white);border-radius:8px;cursor:pointer;font-size:18px;font-weight:600;color:var(--text-dark);display:flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s}
+    .qty-btn:hover{background:var(--bg-light);border-color:var(--text-light)}
+    .qty-btn:active{transform:scale(.95)}
+    .qty-val{width:40px;text-align:center;font-weight:600;font-size:16px}
+    .promo-row{display:flex;gap:10px;margin-top:14px}
+    .promo-row input{flex:1;padding:10px 14px;border:1px solid var(--border);border-radius:var(--border-radius);font-family:var(--font);font-size:14px;background:var(--bg-white);color:var(--text-dark);outline:none}
+    .promo-row input:focus{border-color:var(--primary)}
+    .promo-feedback{font-size:13px;margin-top:8px;font-weight:500;display:none}
+    .promo-feedback.show{display:block}
+    @media(max-width:600px){.form-row{flex-direction:column;gap:0}.form-actions{flex-direction:column}}
+  </style>
+</head>
+<body>
+
+  <nav class="navbar">
+    <a class="nav-logo" href="/pages/1_index.html">
+      <span class="logo-top">Planning</span>
+      <span class="logo-bottom">Center</span>
+    </a>
+    <button class="hamburger" id="hamburger">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="nav-links" id="navLinks">
+      <button class="btn btn-primary"
+        onclick="location.href='/'">
+        <i class="ri-home-line"></i> Home
+      </button>
+      <button class="btn btn-outline" onclick="goToDashboard()">
+        <i class="ri-dashboard-line"></i> Dashboard
+      </button>
+      <button class="btn btn-outline" onclick="logout()">
+        <i class="ri-logout-box-r-line"></i> Logout
+      </button>
+    </div>
+  </nav>
+
+  <main class="reg-page">
+    <h1 class="reg-title">Event Registration</h1>
+    <p class="reg-sub" id="regSubtitle">
+      Complete your registration for the event
+    </p>
+
+    <div class="alert alert-error" id="regError" style="display:none"></div>
+
+    <form id="eventRegForm">
+
+      <!-- Select Tickets -->
+      <div class="form-section">
+        <div class="form-section-title"><i class="ri-coupon-3-line"></i> Select Tickets</div>
+        <div class="ticket-option selected" data-type="general" data-base="250" onclick="selectTicket(this)">
+          <div class="ticket-info">
+            <div class="t-name">General Admission</div>
+            <div class="t-desc">Access to all keynotes &amp; workshops</div>
+          </div>
+          <div class="t-price">$<span class="t-price-val">250</span></div>
+        </div>
+        <div class="ticket-option" data-type="vip" data-base="450" onclick="selectTicket(this)">
+          <div class="ticket-info">
+            <div class="t-name">VIP Pass</div>
+            <div class="t-desc">+ Exclusive lounge &amp; speaker dinner</div>
+          </div>
+          <div class="t-price">$<span class="t-price-val">450</span></div>
+        </div>
+        <div class="qty-row">
+          <span class="q-label">Quantity</span>
+          <div class="qty-controls">
+            <button type="button" class="qty-btn" onclick="changeQty(-1)" aria-label="Decrease quantity">−</button>
+            <span class="qty-val" id="ticketQty">1</span>
+            <button type="button" class="qty-btn" onclick="changeQty(1)" aria-label="Increase quantity">+</button>
+          </div>
+        </div>
+        <div class="promo-row">
+          <input type="text" id="promoInput" placeholder="Promo code (try EARLY20)" />
+          <button type="button" class="btn btn-outline" onclick="applyPromo()">Apply</button>
+        </div>
+        <div class="promo-feedback" id="promoFeedback"></div>
+      </div>
+
+      <!-- Personal Information -->
+      <div class="form-section">
+        <div class="form-section-title">
+          <i class="ri-user-3-line"></i> Personal Information
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>First Name <span style="color:var(--danger)">*</span></label>
+            <input type="text" id="pFirstName"
+              placeholder="Enter your first name" required />
+          </div>
+          <div class="form-group">
+            <label>Last Name <span style="color:var(--danger)">*</span></label>
+            <input type="text" id="pLastName"
+              placeholder="Enter your last name" required />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Email <span style="color:var(--danger)">*</span></label>
+            <input type="email" id="pEmail"
+              placeholder="Enter your email" required />
+          </div>
+          <div class="form-group">
+            <label>Phone Number <span style="color:var(--danger)">*</span></label>
+            <input type="tel" id="pPhone"
+              placeholder="Enter your phone number" required />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Address <span style="color:var(--danger)">*</span></label>
+          <input type="text" id="pAddress"
+            placeholder="Enter your address" required />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>City <span style="color:var(--danger)">*</span></label>
+            <input type="text" id="pCity"
+              placeholder="Enter your city" required />
+          </div>
+          <div class="form-group">
+            <label>ZIP Code</label>
+            <input type="text" id="pZip"
+              placeholder="Enter your ZIP code" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Payment Information -->
+      <div class="form-section">
+        <div class="form-section-title">
+          <i class="ri-bank-card-line"></i> Payment Information
+        </div>
+        <div class="form-group">
+          <label>Cardholder Name <span style="color:var(--danger)">*</span></label>
+          <input type="text" id="cardName"
+            placeholder="Enter your cardholder name" required />
+        </div>
+        <div class="form-group">
+          <label>Card Number <span style="color:var(--danger)">*</span></label>
+          <input type="text" id="cardNumber"
+            placeholder="Enter your card number"
+            maxlength="19"
+            oninput="formatCard(this)" required />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Expiry Date <span style="color:var(--danger)">*</span></label>
+            <input type="text" id="cardExpiry"
+              placeholder="MM/YY" maxlength="5"
+              oninput="formatExpiry(this)" required />
+          </div>
+          <div class="form-group">
+            <label>CVV <span style="color:var(--danger)">*</span></label>
+            <input type="text" id="cardCVV"
+              placeholder="CVV" maxlength="3" required />
+          </div>
+        </div>
+      </div>
+
+      <!-- Order Summary -->
+      <div class="order-summary">
+        <div class="form-section-title" style="margin-bottom:12px">
+          <i class="ri-file-list-3-line"></i> Order Summary
+        </div>
+        <div class="order-row">
+          <span id="summaryTicketLabel">General Admission × 1</span>
+          <span style="color:var(--primary)">$<span id="summaryPrice">250</span></span>
+        </div>
+        <div class="order-row" id="discountRow" style="display:none">
+          <span>Promo discount</span>
+          <span style="color:var(--success)">−$<span id="summaryDiscount">0</span></span>
+        </div>
+        <div class="order-row">
+          <span>Processing Fee</span>
+          <span style="color:var(--primary)">$5</span>
+        </div>
+        <div class="order-total">
+          <span>Total:</span>
+          <span>$<span id="summaryTotal">255</span></span>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn-outline"
+          onclick="history.back()">Cancel</button>
+        <button type="submit" class="btn btn-primary"
+          style="flex:1;max-width:380px">
+          Complete Registration & Payment
+        </button>
+      </div>
+    </form>
+  </main>
+
+  <script src="/assets/js/0_api.js"></script>
+  <script src="/assets/js/1_navbar.js"></script>
+  <script src="/assets/js/2_events.js"></script>
+  <script>
+    function formatCard(input) {
+      let v = input.value.replace(/\D/g,"").substring(0,16);
+      input.value = v.replace(/(.{4})/g,"$1 ").trim();
+    }
+    function formatExpiry(input) {
+      let v = input.value.replace(/\D/g,"").substring(0,4);
+      if (v.length >= 2) v = v.substring(0,2) + "/" + v.substring(2);
+      input.value = v;
+    }
+
+    // ── Ticket selection ──
+    let selectedType  = "general";
+    let selectedPrice = 250;
+    let qty = 1;
+    let discount = 0;
+    const PROCESSING_FEE = 5;
+
+    function selectTicket(el) {
+      document.querySelectorAll(".ticket-option").forEach((o) => o.classList.remove("selected"));
+      el.classList.add("selected");
+      selectedType = el.dataset.type;
+      selectedPrice = Number(el.dataset.base) || 0;
+      discount = 0;
+      document.getElementById("promoInput").value = "";
+      document.getElementById("promoFeedback").classList.remove("show");
+      updateTotals();
+    }
+    function changeQty(d) {
+      const n = qty + d;
+      if (n >= 1 && n <= 10) { qty = n; document.getElementById("ticketQty").textContent = qty; updateTotals(); }
+    }
+    function applyPromo() {
+      const code = document.getElementById("promoInput").value.trim().toUpperCase();
+      const codes = { EARLY20: 0.20, SAVE10: 0.10, VIP50: 0.50 };
+      const fb = document.getElementById("promoFeedback");
+      fb.classList.add("show");
+      if (!code) { fb.textContent = "⚠ Please enter a promo code"; fb.style.color = "var(--warning)"; return; }
+      if (codes[code]) {
+        discount = codes[code];
+        fb.textContent = "✓ " + (discount * 100) + "% off applied"; fb.style.color = "var(--success)";
+      } else {
+        discount = 0;
+        fb.textContent = "✗ Invalid promo code"; fb.style.color = "var(--danger)";
+      }
+      updateTotals();
+    }
+    function updateTotals() {
+      const subtotal = selectedPrice * qty;
+      const disc = subtotal * discount;
+      const total = subtotal - disc + PROCESSING_FEE;
+      document.getElementById("summaryTicketLabel").textContent =
+        (selectedType === "general" ? "General Admission" : "VIP Pass") + " × " + qty;
+      document.getElementById("summaryPrice").textContent = subtotal.toFixed(2);
+      const dRow = document.getElementById("discountRow");
+      if (disc > 0) { dRow.style.display = ""; document.getElementById("summaryDiscount").textContent = disc.toFixed(2); }
+      else { dRow.style.display = "none"; }
+      document.getElementById("summaryTotal").textContent = total.toFixed(2);
+    }
+    document.addEventListener("DOMContentLoaded", () => {
+      const user = getCurrentUser ? getCurrentUser() : null;
+      if (user) {
+        document.getElementById("pFirstName").value = user.firstName || "";
+        document.getElementById("pLastName").value  = user.lastName  || "";
+        document.getElementById("pEmail").value     = user.email     || "";
+      }
+      const event = loadEventFromStorage();
+      if (event) {
+        document.getElementById("regSubtitle").textContent =
+          "Complete your registration for " + event.title;
+        // Ticket prices come from the real event (VIP ≈ 1.8× general)
+        const gen = Number(event.price) || 0;
+        const vip = Math.round(gen * 1.8);
+        const opts = document.querySelectorAll(".ticket-option");
+        opts[0].dataset.base = gen; opts[0].querySelector(".t-price-val").textContent = gen;
+        opts[1].dataset.base = vip; opts[1].querySelector(".t-price-val").textContent = vip;
+        selectedPrice = gen;
+      }
+      updateTotals();
+
+      document.getElementById("promoInput").addEventListener("keypress", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); applyPromo(); }
+      });
+    });
+    document.getElementById("eventRegForm")
+      .addEventListener("submit", (e) => {
+        e.preventDefault();
+        const err = document.getElementById("regError");
+        err.style.display = "none";
+        const fields = [
+          "pFirstName","pLastName","pEmail","pPhone",
+          "pAddress","pCity","cardName","cardNumber",
+          "cardExpiry","cardCVV"
+        ];
+        const empty = fields.some(
+          (id) => !document.getElementById(id).value.trim()
+        );
+        if (empty) {
+          err.textContent   = "Please fill in all required fields.";
+          err.style.display = "block";
+          return;
+        }
+        const user = JSON.parse(localStorage.getItem("erms_user") || "{}");
+        const ev   = JSON.parse(localStorage.getItem("erms_selected_event") || "{}");
+        const ticketCode = "TKT-" + Math.random().toString(36).substring(2,8).toUpperCase();
+        const txnRef     = "TXN-" + Math.random().toString(36).substring(2,10).toUpperCase();
+        const ticketType = selectedType === "general" ? "General Admission" : "VIP Pass";
+        const totalStr   = document.getElementById("summaryTotal").textContent;
+
+        // Save full ticket + payment record
+        const ticket = {
+          id:                Date.now(),
+          userId:            user.id,
+          event:             ev.id,
+          event_title:       ev.title  || "Event",
+          ticket_code:       ticketCode,
+          ticket_type:       ticketType,
+          quantity:          qty,
+          unit_price:        selectedPrice,
+          total_amount:      totalStr,
+          payment_method:    "card",
+          payment_status:    "paid",
+          transaction_reference: txnRef,
+          attendee_name:     document.getElementById("pFirstName").value + " " + document.getElementById("pLastName").value,
+          attendee_email:    document.getElementById("pEmail").value,
+          status:            "confirmed",
+          registered_at:     new Date().toISOString()
+        };
+        const tickets = JSON.parse(localStorage.getItem("erms_tickets") || "[]");
+        tickets.push(ticket);
+        localStorage.setItem("erms_tickets", JSON.stringify(tickets));
+
+        localStorage.setItem("erms_from_payment",  "true");
+        localStorage.setItem("erms_ticket_id",     ticketCode);
+        localStorage.setItem("erms_ticket_type",   ticketType);
+        localStorage.setItem("erms_ticket_qty",    qty);
+        localStorage.setItem("erms_ticket_total",  totalStr);
+        localStorage.setItem("erms_txn_ref",       txnRef);
+        window.location.href = "/pages/10_ticket.html";
+      });
+  </script>
+  <script src="/assets/js/7_cursor.js"></script>
+</body>
+</html>

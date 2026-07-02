@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//d/Education/Y2S2/PP/Event-Registration-Management-System/**)",
+      "Skill(agent-browser)",
+      "Skill(agent-browser:*)",
+      "Bash(npm --version)",
+      "Read(//d/Education/testing/**)",
+      "Bash(mkdir -p \"d:/Education/testing/backend/src/routes\" \"d:/Education/testing/backend/src/middleware\" \"d:/Education/testing/backend/src/lib\" \"d:/Education/testing/backend/prisma\")",
+      "Bash(npm install *)",
+      "Bash(npm approve-scripts *)",
+      "Bash(npx prisma *)",
+      "Bash(node -e \"require\\('./src/index.js'\\)\")",
+      "Bash(curl -s http://localhost:4000/api/health)",
+      "Bash(kill %1)",
+      "Bash(git -C \"d:/Education/testing\" status)",
+      "Bash(git -C \"d:/Education/testing/frontend\" remote -v)",
+      "Bash(git -C \"d:/Education/testing/backend\" remote -v)"
+    ],
+    "additionalDirectories": [
+      "D:\\Education\\Y2S2\\PP\\Event-Registration-Management-System",
+      "d:\\Education\\testing\\backend\\src",
+      "d:\\Education\\testing\\backend",
+      "d:\\Education\\testing"
+    ]
+  }
+}

@@ -1,0 +1,246 @@
+/* ─────────────────────────────────────
+   8_testimonials.css — dual-direction review marquee
+   Used by: 1_index.html
+   ───────────────────────────────────── */
+
+.testimonials {
+  /* Light tokens */
+  --t-card-bg:#ffffff;
+  --t-border:rgba(254,243,199,0.6);          /* amber-100/60 */
+  --t-name:#0f172a;                          /* slate-900 */
+  --t-user:#64748b;                          /* slate-500 */
+  --t-body:#475569;                          /* slate-600 */
+  --t-amber:#F59E0B;
+  --t-amber-50:#FFFBEB;
+  --t-pill:#FEF3C7;
+  --t-pill-text:#92400E;
+  --t-quote:rgba(252,211,77,0.40);           /* amber-300/40 */
+  --t-ring:rgba(245,158,11,0.55);
+  --t-shadow:0 1px 3px rgba(0,0,0,0.06);
+  --t-shadow-hover:0 16px 32px -12px rgba(245,158,11,0.35);
+  --t-glow:rgba(245,158,11,0.18);
+
+  position:relative;
+  padding:64px 0 72px;
+  overflow:hidden;
+  background:linear-gradient(180deg, rgba(255,251,235,0.6) 0%, transparent 60%);
+}
+
+body.dark .testimonials {
+  --t-card-bg:#1e293b;                        /* slate-800 */
+  --t-border:rgba(255,255,255,0.08);          /* white/8 */
+  --t-name:#f1f5f9;
+  --t-user:#94a3b8;
+  --t-body:#cbd5e1;
+  --t-amber:#FBBF24;                          /* amber-400 */
+  --t-amber-50:#2a2438;
+  --t-pill:#3a2f1a;
+  --t-pill-text:#FCD34D;
+  --t-quote:rgba(251,191,36,0.35);
+  --t-ring:rgba(251,191,36,0.50);
+  --t-shadow:0 1px 3px rgba(0,0,0,0.4);
+  --t-shadow-hover:0 16px 32px -12px rgba(0,0,0,0.6);
+  --t-glow:rgba(251,191,36,0.12);
+  background:linear-gradient(180deg, rgba(40,36,56,0.5) 0%, transparent 60%);
+}
+
+/* Ambient amber glow behind the marquee */
+.testimonials::before {
+  content:"";
+  position:absolute;
+  top:32%; left:50%;
+  transform:translate(-50%,-50%);
+  width:62%; height:300px;
+  background:var(--t-glow);
+  filter:blur(90px);
+  border-radius:50%;
+  pointer-events:none;
+  z-index:0;
+}
+
+/* ── Header ── */
+.testi-header {
+  position:relative;
+  z-index:1;
+  text-align:center;
+  margin-bottom:40px;
+  padding:0 16px;
+}
+.testi-eyebrow {
+  display:inline-block;
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:1px;
+  text-transform:uppercase;
+  color:var(--t-amber);
+  background:var(--t-amber-50);
+  padding:5px 14px;
+  border-radius:20px;
+  margin-bottom:14px;
+}
+.testi-header h2 {
+  font-size:28px;
+  font-weight:700;
+  color:var(--t-name);
+}
+
+/* ── Rows ── */
+.testi-rows {
+  position:relative;
+  z-index:1;
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+
+.marquee {
+  overflow:hidden;
+  padding:16px 0;
+  /* Edge fade to mask the scroll boundaries (theme-agnostic) */
+  -webkit-mask-image:linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+          mask-image:linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+}
+.marquee-track {
+  display:flex;
+  gap:16px;
+  width:max-content;
+  animation:t-scroll-left 25s linear infinite;
+}
+.marquee.reverse .marquee-track {
+  animation:t-scroll-right 30s linear infinite;
+}
+@keyframes t-scroll-left  { from { transform:translateX(0);    } to { transform:translateX(-50%); } }
+@keyframes t-scroll-right { from { transform:translateX(-50%); } to { transform:translateX(0);    } }
+
+/* Pause all motion on hover or while a card is focused */
+.testi-rows:hover .marquee-track,
+.testi-rows:focus-within .marquee-track {
+  animation-play-state:paused;
+}
+
+/* ── Card ── */
+.t-card {
+  position:relative;
+  width:320px;
+  flex-shrink:0;
+  box-sizing:border-box;
+  background:var(--t-card-bg);
+  border:1px solid var(--t-border);
+  border-radius:18px;
+  padding:20px;
+  box-shadow:var(--t-shadow);
+  overflow:hidden;
+  transition:transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+}
+.t-card:hover {
+  transform:translateY(-4px);
+  box-shadow:var(--t-shadow-hover);
+  border-color:var(--t-amber);
+}
+.t-card:focus-visible {
+  outline:none;
+  box-shadow:0 0 0 3px var(--t-ring);
+  border-color:var(--t-amber);
+}
+
+/* Amber orb that appears top-right on hover */
+.t-orb {
+  position:absolute;
+  top:-22px; right:-22px;
+  width:84px; height:84px;
+  border-radius:50%;
+  background:radial-gradient(circle, var(--t-amber), transparent 70%);
+  opacity:0;
+  transition:opacity .3s ease;
+  pointer-events:none;
+}
+.t-card:hover .t-orb { opacity:0.22; }
+
+.t-head {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-bottom:14px;
+  position:relative;
+}
+.t-avatar {
+  position:relative;
+  width:40px; height:40px;
+  border-radius:50%;
+  flex-shrink:0;
+  background:linear-gradient(135deg, var(--t-amber), #FB923C);
+  color:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:700;
+  font-size:14px;
+  /* Amber ring */
+  box-shadow:0 0 0 2px var(--t-card-bg), 0 0 0 4px var(--t-ring);
+}
+.t-avatar img {
+  position:absolute;
+  inset:0;
+  width:100%; height:100%;
+  object-fit:cover;
+  border-radius:50%;
+}
+.t-online {
+  position:absolute;
+  bottom:-1px; right:-1px;
+  width:11px; height:11px;
+  border-radius:50%;
+  background:#22c55e;
+  border:2px solid var(--t-card-bg);
+  z-index:2;
+}
+.t-name { font-size:14px; font-weight:600; color:var(--t-name); }
+.t-user { font-size:13px; font-weight:500; color:var(--t-user); }
+
+.t-body {
+  font-size:14px;
+  line-height:1.7;
+  color:var(--t-body);
+}
+.t-quote {
+  font-family:Georgia, serif;
+  font-size:30px;
+  line-height:0;
+  font-weight:700;
+  color:var(--t-quote);
+  margin-right:3px;
+  vertical-align:-9px;
+}
+.t-role {
+  display:inline-block;
+  margin-top:14px;
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:0.4px;
+  text-transform:uppercase;
+  color:var(--t-pill-text);
+  background:var(--t-pill);
+  padding:4px 10px;
+  border-radius:20px;
+}
+
+/* ── Reduced-motion: static grid instead of marquee ── */
+.t-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));
+  gap:16px;
+  max-width:1100px;
+  margin:0 auto;
+  padding:0 16px;
+}
+.testi-rows.static .t-card { width:auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track { animation:none; }
+}
+
+@media (max-width:768px) {
+  .testimonials   { padding:48px 0 56px; }
+  .testi-header h2 { font-size:22px; }
+  .t-card         { width:280px; }
+}

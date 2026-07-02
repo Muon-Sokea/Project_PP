@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Planning Center — Organizer Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="/assets/css/1_global.css" />
+  <link rel="stylesheet" href="/assets/css/2_navbar.css" />
+  <link rel="stylesheet" href="/assets/css/6_dashboard.css" />
+  <style>
+    .view{display:none}
+    .view.active{display:block;animation:orgFade .25s ease}
+    @keyframes orgFade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+    .view-back{display:inline-flex;align-items:center;gap:6px;font-size:14px;color:var(--text-medium);cursor:pointer;margin-bottom:14px}
+    .view-back:hover{color:var(--primary)}
+    .org-toolbar{display:flex;gap:10px;align-items:center;background:var(--bg-white);border:1px solid var(--border);border-radius:var(--border-radius-lg);padding:12px 16px;margin-bottom:16px;flex-wrap:wrap}
+    .org-toolbar .spacer{flex:1}
+    .att-toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+    .att-search{flex:1;min-width:200px;padding:9px 14px;border:1px solid var(--border);border-radius:var(--border-radius);font-family:var(--font);font-size:14px;background:var(--bg-white);color:var(--text-dark);outline:none}
+    .att-search:focus{border-color:var(--primary)}
+    .att-filter{padding:9px 12px;border:1px solid var(--border);border-radius:var(--border-radius);font-family:var(--font);font-size:14px;background:var(--bg-white);color:var(--text-dark)}
+    .att-name-cell{display:flex;align-items:center;gap:10px}
+    .row-act{width:30px;height:30px;border:1px solid var(--border);border-radius:6px;background:var(--bg-white);cursor:pointer;color:var(--text-medium);font-size:15px;transition:border-color .15s,color .15s}
+    .row-act:hover{border-color:var(--primary);color:var(--primary)}
+    .row-act.on{background:var(--success);border-color:var(--success);color:#fff}
+    .edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .edit-grid .full{grid-column:1/-1}
+    @media(max-width:640px){.edit-grid{grid-template-columns:1fr}}
+    .ev-summary-img{width:100%;max-height:240px;object-fit:cover;border-radius:var(--border-radius-lg);margin-bottom:16px}
+    .top5-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+    .top5-row:last-child{border-bottom:none}
+    .top5-row .grow{flex:1}
+    .top5-row .em{font-size:12px;color:var(--text-light)}
+    /* Delete modal */
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:16px}
+    .modal-overlay.open{display:flex}
+    .modal-sm{background:var(--bg-white);border-radius:var(--border-radius-lg);max-width:400px;width:100%;padding:28px 24px;text-align:center;box-shadow:var(--shadow-lg)}
+    .modal-warn{width:56px;height:56px;border-radius:50%;background:#fde8e8;color:var(--danger);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 14px}
+    body.dark .modal-warn{background:rgba(220,53,69,0.2)}
+    .modal-sm h3{font-size:18px;font-weight:700;margin-bottom:8px;color:var(--text-dark)}
+    .modal-sm p{font-size:14px;color:var(--text-medium);margin-bottom:20px;line-height:1.6}
+    .modal-actions{display:flex;gap:10px}
+    .modal-actions .btn{flex:1}
+    .toast{position:fixed;top:80px;right:24px;background:var(--text-dark);color:#fff;padding:12px 18px;border-radius:10px;font-size:14px;box-shadow:var(--shadow-lg);opacity:0;transform:translateY(-10px);transition:opacity .25s,transform .25s;z-index:1100;pointer-events:none}
+    .toast.show{opacity:1;transform:translateY(0)}
+  </style>
+</head>
+<body>
+
+  <nav class="navbar">
+    <a class="nav-logo" href="/pages/1_index.html">
+      <span class="logo-top">Planning</span>
+      <span class="logo-bottom">Center</span>
+    </a>
+    <button class="hamburger" id="hamburger"><span></span><span></span><span></span></button>
+    <div class="nav-links" id="navLinks">
+      <button class="btn btn-outline" onclick="location.href='/pages/1_index.html'">
+        <i class="ri-home-line"></i> Home
+      </button>
+      <button class="btn btn-primary"><i class="ri-dashboard-line"></i> Dashboard</button>
+      <button class="btn btn-outline" onclick="logout()">
+        <i class="ri-logout-box-r-line"></i> Logout
+      </button>
+    </div>
+  </nav>
+
+  <div class="dashboard-page">
+    <div class="dashboard-header">
+      <div>
+        <h1 id="dashTitle">Organizer Dashboard</h1>
+        <p id="dashSub">Manage your events and track performance</p>
+      </div>
+      <button class="btn btn-primary" id="createBtn" onclick="openCreateEvent()">
+        <i class="ri-add-line"></i> Create New Event
+      </button>
+    </div>
+
+    <div class="dashboard-body">
+
+      <!-- ══ HOME ══ -->
+      <section class="view active" id="view-home">
+        <div class="stats-cards" id="statCards"></div>
+        <div class="section-title">My Events</div>
+        <div id="eventsList"></div>
+      </section>
+
+      <!-- ══ VIEW EVENT ══ -->
+      <section class="view" id="view-event">
+        <span class="view-back" onclick="showView('home')"><i class="ri-arrow-left-line"></i> Back to dashboard</span>
+        <div class="org-toolbar" id="eventToolbar"></div>
+        <div id="eventDetail"></div>
+      </section>
+
+      <!-- ══ EDIT EVENT ══ -->
+      <section class="view" id="view-edit">
+        <span class="view-back" onclick="showView('home')"><i class="ri-arrow-left-line"></i> Back to dashboard</span>
+        <div class="detail-section" id="editForm" style="background:var(--bg-white);border:1px solid var(--border);border-radius:var(--border-radius-lg);padding:24px"></div>
+      </section>
+
+      <!-- ══ ATTENDEES ══ -->
+      <section class="view" id="view-attendees">
+        <span class="view-back" onclick="showView('home')"><i class="ri-arrow-left-line"></i> Back to dashboard</span>
+        <div class="section-title" id="attTitle">Attendees</div>
+        <div class="att-toolbar">
+          <input class="att-search" id="attSearch" placeholder="Search name or email…" oninput="renderAttendees()" />
+          <select class="att-filter" id="attFilter" onchange="renderAttendees()">
+            <option value="all">All statuses</option>
+            <option value="checked-in">Checked-in</option>
+            <option value="pending">Pending</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="exportCSV()">
+            <i class="ri-download-2-line"></i> Export CSV
+          </button>
+        </div>
+        <div id="attendeesTableWrap"></div>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- Delete confirmation modal -->
+  <div class="modal-overlay" id="deleteModal">
+    <div class="modal-sm">
+      <div class="modal-warn"><i class="ri-error-warning-line" aria-hidden="true"></i></div>
+      <h3>Delete event?</h3>
+      <p id="deleteText">This action cannot be undone.</p>
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closeDelete()">Cancel</button>
+        <button class="btn btn-danger" onclick="doDelete()">Yes, Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="/assets/js/0_api.js"></script>
+  <script src="/assets/js/1_navbar.js"></script>
+  <script>
+    const BYPASS_AUTH = true;
+    if (!BYPASS_AUTH) {
+        requireAuth();
+        
+    requireRole(["Organizer"]);
+    }
+
+    // ── Mock data ──
+    let orgEvents = [
+      { id:1, title:"Tech Innovation Summit 2026", category:"Technology", date:"October 30, 2026",
+        time:"9:00 AM - 5:00 PM", location:"Prey Veng Province", image:"/assets/images/Technology.png",
+        price:250, capacity:2300, registered:1000, status:"published",
+        description:"The premier technology conference of 2026 — AI, Web3 and sustainable tech." },
+      { id:2, title:"Digital Marketing Workshop", category:"Education", date:"September 20, 2026",
+        time:"9:00 AM - 4:00 PM", location:"Phnom Penh, RUPP", image:"/assets/images/Business.webp",
+        price:100, capacity:2000, registered:1500, status:"published",
+        description:"Hands-on workshop covering modern digital marketing strategy and tools." },
+      { id:3, title:"Networking & Innovation Forum", category:"Networking", date:"September 20, 2026",
+        time:"10:00 AM - 5:00 PM", location:"Phnom Penh, RUPP", image:"/assets/images/Networking.jpg",
+        price:50, capacity:2000, registered:2000, status:"draft",
+        description:"Connect with founders, investors and creators across the region." }
+    ];
+
+    let attList = [
+      { name:"Dara Phon",      email:"dara.phon@gmail.com",     ticket:"General", date:"Sep 2, 2026",  status:"checked-in" },
+      { name:"Mealea Sok",     email:"mealea.sok@gmail.com",    ticket:"VIP",     date:"Sep 3, 2026",  status:"pending"   },
+      { name:"Rithy Chan",     email:"rithy.chan@gmail.com",    ticket:"General", date:"Sep 5, 2026",  status:"checked-in" },
+      { name:"Bopha Nuon",     email:"bopha.nuon@gmail.com",    ticket:"VIP",     date:"Sep 6, 2026",  status:"pending"   },
+      { name:"Visal Kong",     email:"visal.kong@gmail.com",    ticket:"General", date:"Sep 8, 2026",  status:"cancelled" },
+      { name:"Channary Ros",   email:"channary.ros@gmail.com",  ticket:"General", date:"Sep 9, 2026",  status:"checked-in" },
+      { name:"Pisey Hang",     email:"pisey.hang@gmail.com",    ticket:"VIP",     date:"Sep 10, 2026", status:"pending"   },
+      { name:"Sokchea Lim",    email:"sokchea.lim@gmail.com",   ticket:"General", date:"Sep 12, 2026", status:"checked-in" }
+    ];
+
+    let currentEventId = null;
+    let pendingDeleteId = null;
+
+    const money = (n) => "$" + Number(n).toLocaleString();
+    const getEvent = (id) => orgEvents.find((e) => e.id === id);
+    const initials = (n) => n.split(/\s+/).map((w) => w.charAt(0)).join("").slice(0,2).toUpperCase();
+    const statusBadge = (s) => {
+      const map = { "checked-in":"badge-confirmed", pending:"badge-pending", cancelled:"badge-cancelled" };
+      const label = s === "checked-in" ? "Checked-in" : s.charAt(0).toUpperCase() + s.slice(1);
+      return '<span class="badge ' + (map[s] || "badge-pending") + '">' + label + '</span>';
+    };
+
+    // ── View switching ──
+    function showView(name, id) {
+      if (id !== undefined) currentEventId = id;
+      document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
+      document.getElementById("view-" + name).classList.add("active");
+      document.getElementById("createBtn").style.display = name === "home" ? "" : "none";
+      const titles = {
+        home:      ["Organizer Dashboard", "Manage your events and track performance"],
+        event:     ["Event Overview", "Organizer view of your event"],
+        edit:      ["Edit Event", "Update your event details"],
+        attendees: ["Attendees", "Manage registrations and check-ins"]
+      };
+      document.getElementById("dashTitle").textContent = titles[name][0];
+      document.getElementById("dashSub").textContent = titles[name][1];
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    // ── Home ──
+    function renderHome() {
+      const totalReg = orgEvents.reduce((s, e) => s + e.registered, 0);
+      const totalRev = orgEvents.reduce((s, e) => s + e.registered * e.price, 0);
+      const avgAtt = orgEvents.length ? Math.round(totalReg / orgEvents.length) : 0;
+      const published = orgEvents.filter((e) => e.status === "published").length;
+
+      const stats = [
+        { label:"Total Events", value:orgEvents.length, sub:published + " published", icon:"ri-file-list-3-line" },
+        { label:"Total Registrations", value:totalReg.toLocaleString(), sub:"Across all events", icon:"ri-group-line" },
+        { label:"Total Revenue", value:money(totalRev), sub:"Gross to date", icon:"ri-money-dollar-circle-line" },
+        { label:"Average Attendance", value:avgAtt.toLocaleString(), sub:"Per event", icon:"ri-bar-chart-line" }
+      ];
+      document.getElementById("statCards").innerHTML = stats.map((s) =>
+        '<div class="stat-card"><div class="stat-card-info"><div class="label">' + s.label +
+        '</div><div class="value">' + s.value + '</div><div style="font-size:12px;color:var(--text-light)">' +
+        s.sub + '</div></div><div class="stat-card-icon"><i class="' + s.icon + '"></i></div></div>'
+      ).join("");
+
+      document.getElementById("eventsList").innerHTML = orgEvents.length
+        ? orgEvents.map(eventCard).join("")
+        : '<div class="empty-state"><p>No events yet. Create your first event!</p></div>';
+    }
+
+    function eventCard(e) {
+      const pct = Math.min(100, Math.round((e.registered / e.capacity) * 100));
+      const badge = e.status === "published"
+        ? '<span class="badge badge-confirmed">Published</span>'
+        : '<span class="badge badge-pending">Draft</span>';
+      return `
+        <div class="org-event-card">
+          <div class="org-event-img">
+            <img src="${e.image}" alt="${e.title}" onerror="this.src='/assets/images/Sport%20event.jpg'" />
+            <div class="org-price-tag">$${e.price}</div>
+          </div>
+          <div class="org-event-info">
+            <div style="margin-bottom:6px">${badge}</div>
+            <h3>${e.title}</h3>
+            <div class="org-event-date"><i class="ri-calendar-line"></i> ${e.date}</div>
+            <div class="org-progress-label">
+              <span>Registrations: ${e.registered.toLocaleString()} / ${e.capacity.toLocaleString()}</span>
+              <span>${pct}% filled</span>
+            </div>
+            <div class="org-progress-bar"><div class="org-progress-fill" style="width:${pct}%"></div></div>
+            <div class="org-event-stats">
+              <div class="org-stat-item"><div class="s-label">Revenue</div><div class="s-value">${money(e.registered * e.price)}</div></div>
+              <div class="org-stat-item"><div class="s-label">Attendees</div><div class="s-value">${e.registered.toLocaleString()}</div></div>
+              <div class="org-stat-item"><div class="s-label">Available</div><div class="s-value">${(e.capacity - e.registered).toLocaleString()}</div></div>
+            </div>
+            <div class="org-event-actions">
+              <button class="btn btn-view-event btn-sm" onclick="viewEvent(${e.id})"><i class="ri-eye-line"></i> View Event</button>
+              <button class="btn btn-outline btn-sm" onclick="editEvent(${e.id})"><i class="ri-edit-line"></i> Edit</button>
+              <button class="btn btn-outline btn-sm" onclick="duplicateEvent(${e.id})"><i class="ri-file-copy-line"></i> Duplicate</button>
+              <button class="btn btn-outline btn-sm" onclick="viewAttendees(${e.id})"><i class="ri-group-line"></i> View Attendees</button>
+              <button class="btn btn-delete btn-sm" onclick="confirmDelete(${e.id})"><i class="ri-delete-bin-line"></i> Delete</button>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    // ── View Event (organizer perspective) ──
+    function viewEvent(id) {
+      const e = getEvent(id); if (!e) return;
+      showView("event", id);
+
+      document.getElementById("eventToolbar").innerHTML =
+        '<strong style="font-size:15px">' + e.title + '</strong>' +
+        '<span class="spacer"></span>' +
+        '<button class="btn btn-outline btn-sm" onclick="editEvent(' + e.id + ')"><i class="ri-edit-line"></i> Edit</button>' +
+        '<button class="btn btn-outline btn-sm" onclick="togglePublish(' + e.id + ')" id="pubBtn">' +
+          (e.status === "published" ? '<i class="ri-eye-off-line"></i> Unpublish' : '<i class="ri-send-plane-line"></i> Publish') + '</button>' +
+        '<button class="btn btn-primary btn-sm" onclick="showToast(\'Analytics coming soon\')"><i class="ri-line-chart-line"></i> Analytics</button>';
+
+      const pct = Math.min(100, Math.round((e.registered / e.capacity) * 100));
+      const top5 = attList.slice(0, 5).map((a) =>
+        '<div class="top5-row"><div class="avatar-circle">' + initials(a.name) + '</div>' +
+        '<div class="grow"><div style="font-weight:600;font-size:14px">' + a.name + '</div>' +
+        '<div class="em">' + a.email + '</div></div>' + statusBadge(a.status) + '</div>'
+      ).join("");
+
+      document.getElementById("eventDetail").innerHTML =
+        '<div class="detail-section" style="background:var(--bg-white);border:1px solid var(--border);border-radius:var(--border-radius-lg);padding:20px 24px;margin-bottom:16px">' +
+          '<img class="ev-summary-img" src="' + e.image + '" alt="' + e.title + '" onerror="this.src=\'/assets/images/Sport%20event.jpg\'" />' +
+          '<div style="margin-bottom:8px">' + (e.status === "published"
+            ? '<span class="badge badge-confirmed">Published</span>' : '<span class="badge badge-pending">Draft</span>') + '</div>' +
+          '<h2 style="font-size:20px;font-weight:700;margin-bottom:10px">' + e.title + '</h2>' +
+          '<p style="font-size:14px;color:var(--text-medium);line-height:1.7;margin-bottom:14px">' + e.description + '</p>' +
+          '<div class="org-event-stats">' +
+            '<div class="org-stat-item"><div class="s-label">Date</div><div class="s-value" style="font-size:13px">' + e.date + '</div></div>' +
+            '<div class="org-stat-item"><div class="s-label">Location</div><div class="s-value" style="font-size:13px">' + e.location + '</div></div>' +
+            '<div class="org-stat-item"><div class="s-label">Price</div><div class="s-value">$' + e.price + '</div></div>' +
+            '<div class="org-stat-item"><div class="s-label">Filled</div><div class="s-value">' + pct + '%</div></div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="detail-section" style="background:var(--bg-white);border:1px solid var(--border);border-radius:var(--border-radius-lg);padding:20px 24px">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">' +
+            '<strong style="font-size:15px">Recent Attendees</strong>' +
+            '<span class="view-back" style="margin:0" onclick="viewAttendees(' + e.id + ')">View all <i class="ri-arrow-right-line"></i></span>' +
+          '</div>' + top5 +
+        '</div>';
+    }
+
+    function togglePublish(id) {
+      const e = getEvent(id); if (!e) return;
+      e.status = e.status === "published" ? "draft" : "published";
+      showToast(e.status === "published" ? "Event published" : "Event unpublished");
+      viewEvent(id);
+      renderHome();
+    }
+
+    // ── Edit Event → open the full 5-step wizard, pre-filled ──
+    // We stash the event for the wizard to read, then navigate. The wizard
+    // upserts back into erms_created_events by id, so edits persist (an edited
+    // built-in event gets a created-events copy that shadows the original).
+    function editEvent(id) {
+      const e = getEvent(id); if (!e) return;
+      try { localStorage.setItem("erms_edit_event", JSON.stringify(e)); } catch (err) {}
+      window.location.href = "/pages/11_create-event.html";
+    }
+
+    function duplicateEvent(id) {
+      const e = getEvent(id); if (!e) return;
+      const copy = Object.assign({}, e, {
+        id:       Date.now(),
+        title:    "Copy of " + e.title,
+        status:   "draft",
+        registered: 0
+      });
+      const stored = JSON.parse(localStorage.getItem("erms_created_events") || "[]");
+      stored.push(copy);
+      localStorage.setItem("erms_created_events", JSON.stringify(stored));
+      showToast("Event duplicated as draft: \"" + copy.title + "\"");
+      renderHome();
+    }
+
+    // ── Attendees ──
+    function viewAttendees(id) {
+      showView("attendees", id);
+      const e = getEvent(id);
+      document.getElementById("attTitle").textContent = e ? "Attendees — " + e.title : "Attendees";
+      document.getElementById("attSearch").value = "";
+      document.getElementById("attFilter").value = "all";
+      renderAttendees();
+    }
+
+    function currentAttendees() {
+      const q = (document.getElementById("attSearch").value || "").toLowerCase();
+      const f = document.getElementById("attFilter").value;
+      return attList.filter((a) =>
+        (f === "all" || a.status === f) &&
+        (!q || a.name.toLowerCase().includes(q) || a.email.toLowerCase().includes(q))
+      );
+    }
+
+    function renderAttendees() {
+      const rows = currentAttendees();
+      const wrap = document.getElementById("attendeesTableWrap");
+      if (!rows.length) { wrap.innerHTML = '<div class="empty-state"><p>No attendees match your filters.</p></div>'; return; }
+      wrap.innerHTML =
+        '<table class="data-table"><thead><tr>' +
+          '<th>Attendee</th><th>Email</th><th>Ticket</th><th>Purchase Date</th><th>Status</th><th>Actions</th>' +
+        '</tr></thead><tbody>' +
+        rows.map((a) => {
+          const i = attList.indexOf(a);
+          const checked = a.status === "checked-in";
+          return '<tr>' +
+            '<td><div class="att-name-cell"><div class="avatar-circle">' + initials(a.name) + '</div>' + a.name + '</div></td>' +
+            '<td>' + a.email + '</td><td>' + a.ticket + '</td><td>' + a.date + '</td>' +
+            '<td>' + statusBadge(a.status) + '</td>' +
+            '<td><div class="action-btns">' +
+              '<button class="row-act" title="Resend confirmation email" onclick="resendEmail(' + i + ')"><i class="ri-mail-send-line"></i></button>' +
+              '<button class="row-act ' + (checked ? "on" : "") + '" title="Toggle check-in" onclick="toggleCheckin(' + i + ')"><i class="ri-checkbox-circle-line"></i></button>' +
+            '</div></td>' +
+          '</tr>';
+        }).join("") +
+        '</tbody></table>';
+    }
+
+    function toggleCheckin(i) {
+      const a = attList[i]; if (!a) return;
+      if (a.status === "cancelled") { showToast("Cancelled registrations can't be checked in"); return; }
+      a.status = a.status === "checked-in" ? "pending" : "checked-in";
+      renderAttendees();
+    }
+    function resendEmail(i) {
+      const a = attList[i]; if (!a) return;
+      showToast("📧 Confirmation resent to " + a.email);
+    }
+
+    function exportCSV() {
+      const rows = currentAttendees();
+      if (!rows.length) { showToast("Nothing to export"); return; }
+      const cell = (v) => { v = String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+      const csv = [["Name","Email","Ticket","Purchase Date","Status"].join(",")]
+        .concat(rows.map((a) => [a.name, a.email, a.ticket, a.date, a.status].map(cell).join(",")))
+        .join("\r\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "attendees.csv";
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      showToast("⬇ CSV exported (" + rows.length + " rows)");
+    }
+
+    // ── Delete ──
+    function confirmDelete(id) {
+      const e = getEvent(id); if (!e) return;
+      pendingDeleteId = id;
+      document.getElementById("deleteText").innerHTML =
+        'Are you sure you want to delete <strong>' + e.title + '</strong>? This action cannot be undone.';
+      document.getElementById("deleteModal").classList.add("open");
+    }
+    function closeDelete() {
+      document.getElementById("deleteModal").classList.remove("open");
+      pendingDeleteId = null;
+    }
+    function doDelete() {
+      orgEvents = orgEvents.filter((e) => e.id !== pendingDeleteId);
+      try {
+        const created = JSON.parse(localStorage.getItem("erms_created_events") || "[]");
+        localStorage.setItem("erms_created_events",
+          JSON.stringify(created.filter((e) => e.id !== pendingDeleteId)));
+      } catch (e) {}
+      closeDelete();
+      renderHome();
+      showView("home");
+      showToast("🗑 Event deleted");
+    }
+
+    // ── Create Event → opens the full 5-step wizard page ──
+    function openCreateEvent() {
+      window.location.href = "/pages/11_create-event.html";
+    }
+
+    // ── Toast ──
+    let toastTimer = 0;
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg; t.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => t.classList.remove("show"), 2200);
+    }
+
+    // Close delete modal on backdrop click
+    document.getElementById("deleteModal").addEventListener("click", (e) => {
+      if (e.target.id === "deleteModal") closeDelete();
+    });
+
+    // Merge any events created/edited via the wizard (persisted in localStorage).
+    // Dedupe by id so an edited built-in event shows its edited copy (created
+    // wins) instead of appearing twice.
+    try {
+      const created = JSON.parse(localStorage.getItem("erms_created_events") || "[]");
+      if (Array.isArray(created) && created.length) {
+        const byId = new Map(orgEvents.map((e) => [String(e.id), e]));
+        created.forEach((e) => byId.set(String(e.id), e));
+        orgEvents = Array.from(byId.values());
+      }
+    } catch (e) {}
+
+    // Init
+    renderHome();
+  </script>
+  <script src="/assets/js/7_cursor.js"></script>
+</body>
+</html>

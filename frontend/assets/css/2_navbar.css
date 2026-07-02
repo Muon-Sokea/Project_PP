@@ -1,0 +1,130 @@
+.navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 40px;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  backdrop-filter: blur(14px) saturate(160%);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  transition: box-shadow 0.25s ease, background 0.3s ease;
+}
+/* Deeper shadow once the page is scrolled (toggled in 1_navbar.js) */
+.navbar.scrolled { box-shadow: var(--shadow-md); }
+
+.nav-logo {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.logo-top {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--primary);
+  font-style: italic;
+  font-family: Georgia, serif;
+}
+
+.logo-bottom {
+  font-size: 21px;
+  font-weight: 800;
+  color: var(--primary);
+  font-style: italic;
+  font-family: Georgia, serif;
+}
+
+.nav-links {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.hamburger {
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.hamburger span {
+  display: block;
+  width: 24px;
+  height: 2.5px;
+  background: var(--primary);
+  border-radius: 2px;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+/* Morph into an X when the menu is open (toggled in 1_navbar.js) */
+.hamburger.active span:nth-child(1) { transform: translateY(7.5px) rotate(45deg); }
+.hamburger.active span:nth-child(2) { opacity: 0; }
+.hamburger.active span:nth-child(3) { transform: translateY(-7.5px) rotate(-45deg); }
+
+@media (max-width: 768px) {
+  .navbar { padding: 12px 20px; }
+  .hamburger { display: flex; }
+  .nav-links {
+    display: none;
+    flex-direction: column;
+    width: 100%;
+    position: absolute;
+    top: 62px;
+    left: 0; right: 0;
+    background: var(--bg-white);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px;
+    gap: 10px;
+    z-index: 99;
+  }
+  .nav-links.open { display: flex; }
+  .nav-links .btn { width: 100%; justify-content: center; }
+}
+
+.nav-greeting {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-medium);
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+/* ── Theme segmented control (Light | Auto | Dark) ── */
+.theme-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--bg-light);
+}
+.theme-seg button {
+  width: 30px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: 16px;
+  cursor: pointer;
+  font-size: 15px;
+  color: var(--text-light);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.theme-seg button:hover { color: var(--primary); }
+.theme-seg button.active {
+  background: var(--gradient-primary);
+  color: #fff;
+}
+@media (max-width: 768px) {
+  .theme-seg { align-self: flex-start; }
+}

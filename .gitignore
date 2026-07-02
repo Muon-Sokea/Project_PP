@@ -1,0 +1,45 @@
+# ── Dependencies ───────────────────────────────────────────────
+node_modules/
+*/node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# ── Builds ─────────────────────────────────────────────────────
+frontend/dist/
+frontend/.vite/
+build/
+*.egg-info/
+
+# ── Environment ────────────────────────────────────────────────
+.env
+.env.local
+.env.production
+*/.env
+*/.env.local
+*/.env.production
+
+# ── Prisma ─────────────────────────────────────────────────────
+backend/prisma/migrations/*.sql.bak
+*.db
+*.sqlite3
+
+# ── OS ─────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Logs ───────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+
+# ── IDE ────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+
+# ── Archives (keep source, ignore copies) ──────────────────────
+*.zip
+
+# ── Windows reserved names (can interfere with git) ───────────
+[nN][uU][lL]

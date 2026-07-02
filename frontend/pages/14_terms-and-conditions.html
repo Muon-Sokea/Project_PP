@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Terms &amp; Conditions — Planning Center</title>
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("erms_theme") || "auto";
+        if (t === "dark" || (t === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches))
+          document.documentElement.classList.add("dark");
+      } catch (e) {}
+    })();
+  </script>
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/1_global.css" />
+  <link rel="stylesheet" href="/assets/css/2_navbar.css" />
+  <style>
+    .legal-wrap {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+    }
+
+    .legal-header {
+      margin-bottom: 40px;
+      padding-bottom: 24px;
+      border-bottom: 2px solid var(--primary, #F59E0B);
+    }
+    .legal-header .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(245,158,11,0.12);
+      color: var(--primary, #F59E0B);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 14px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .legal-header h1 {
+      font-size: clamp(26px, 5vw, 36px);
+      font-weight: 800;
+      color: var(--text-dark, #111827);
+      margin: 0 0 10px;
+      line-height: 1.2;
+    }
+    .legal-header .updated {
+      font-size: 13px;
+      color: var(--text-light, #9CA3AF);
+    }
+
+    .legal-body h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-dark, #111827);
+      margin: 36px 0 12px;
+      padding-left: 12px;
+      border-left: 3px solid var(--primary, #F59E0B);
+    }
+    .legal-body h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-dark, #111827);
+      margin: 20px 0 8px;
+    }
+    .legal-body p {
+      font-size: 14px;
+      line-height: 1.75;
+      color: var(--text-medium, #6B7280);
+      margin: 0 0 12px;
+    }
+    .legal-body ul {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 14px 0;
+    }
+    .legal-body ul li {
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--text-medium, #6B7280);
+      padding: 3px 0 3px 20px;
+      position: relative;
+    }
+    .legal-body ul li::before {
+      content: "";
+      position: absolute;
+      left: 6px;
+      top: 12px;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--primary, #F59E0B);
+    }
+
+    .highlight-box {
+      background: rgba(245,158,11,0.07);
+      border: 1px solid rgba(245,158,11,0.25);
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin: 12px 0 18px;
+    }
+    .highlight-box p { margin: 0; font-weight: 500; color: var(--text-dark, #111827); }
+
+    .legal-contact-box {
+      margin-top: 32px;
+      background: var(--bg-white, #fff);
+      border: 1px solid var(--border, #E5E7EB);
+      border-radius: 14px;
+      padding: 24px 28px;
+    }
+    .legal-contact-box h2 {
+      border-left: none;
+      padding-left: 0;
+      margin-top: 0;
+    }
+    .legal-contact-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--text-medium, #6B7280);
+      margin-bottom: 10px;
+    }
+    .legal-contact-row i { color: var(--primary, #F59E0B); font-size: 17px; }
+    .legal-contact-row a { color: var(--primary, #F59E0B); text-decoration: none; font-weight: 500; }
+    .legal-contact-row a:hover { text-decoration: underline; }
+
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 28px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-medium, #6B7280);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .back-btn:hover { color: var(--primary, #F59E0B); }
+
+    @media (max-width: 600px) {
+      .legal-wrap { padding: 24px 16px 60px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <a class="nav-logo" href="/">
+      <span class="logo-top">Planning</span>
+      <span class="logo-bottom">Center</span>
+    </a>
+    <button class="hamburger" id="hamburger" aria-label="Toggle menu">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="nav-links" id="navLinks">
+      <button class="btn btn-outline" onclick="window.close();setTimeout(function(){window.location.href='/pages/3_register.html';},50)">
+        <i class="ri-arrow-left-line"></i> Back
+      </button>
+      <button class="btn btn-primary" onclick="location.href='/'">
+        <i class="ri-home-line"></i> Home
+      </button>
+    </div>
+  </nav>
+
+  <main class="legal-wrap">
+    <a class="back-btn" href="javascript:void(0)" onclick="window.close();setTimeout(function(){window.location.href='/pages/3_register.html';},50)">
+      <i class="ri-arrow-left-s-line"></i> Close
+    </a>
+
+    <div class="legal-header">
+      <div class="badge"><i class="ri-file-list-3-line"></i> Legal</div>
+      <h1>Terms &amp; Conditions</h1>
+      <p class="updated">Last Updated: June 15, 2026</p>
+    </div>
+
+    <div class="legal-body">
+
+      <h2>1. Acceptance of Terms</h2>
+      <p>By accessing or using Planning Center, you agree to comply with these Terms and Conditions. If you do not agree, you must not use the platform.</p>
+
+      <h2>2. User Accounts</h2>
+
+      <h3>Registration</h3>
+      <p>Users must provide accurate and complete information during registration.</p>
+
+      <h3>Account Security</h3>
+      <p>You are responsible for:</p>
+      <ul>
+        <li>Maintaining account confidentiality</li>
+        <li>Protecting your password</li>
+        <li>All activities performed through your account</li>
+      </ul>
+      <p>You must notify us immediately of any unauthorized use.</p>
+
+      <h2>3. Event Registration</h2>
+      <p>By registering for an event, you agree that:</p>
+      <ul>
+        <li>Registration information is accurate</li>
+        <li>Event availability may be limited</li>
+        <li>Organizers may impose additional event-specific requirements</li>
+        <li>Attendance may be subject to venue rules and regulations</li>
+      </ul>
+
+      <h2>4. Payments</h2>
+      <p>Where applicable, payment is required before registration is confirmed. Accepted payment methods may include:</p>
+      <ul>
+        <li>Credit cards</li>
+        <li>Debit cards</li>
+        <li>Digital payment services</li>
+        <li>Other approved payment methods</li>
+      </ul>
+      <p>All prices are displayed in the applicable currency unless otherwise stated.</p>
+
+      <h2>5. Refund Policy</h2>
+      <p>Unless otherwise specified by the event organizer:</p>
+      <div class="highlight-box">
+        <p>Full refund up to 7 days before the event &nbsp;·&nbsp; 50% refund within 7 days &nbsp;·&nbsp; No refund within 48 hours of start time</p>
+      </div>
+      <p>Processing fees charged by payment providers may be non-refundable where permitted by law.</p>
+
+      <h2>6. Event Changes and Cancellations</h2>
+      <p>Event organizers may modify schedules, change venues, replace speakers, reschedule, or cancel events. Where applicable, affected attendees will be notified and refund options may be provided according to organizer policies.</p>
+
+      <h2>7. User Conduct</h2>
+      <p>Users agree not to:</p>
+      <ul>
+        <li>Violate applicable laws</li>
+        <li>Harass other users or attendees</li>
+        <li>Submit false information</li>
+        <li>Disrupt events</li>
+        <li>Attempt unauthorized access to systems</li>
+        <li>Upload malicious software</li>
+      </ul>
+      <p>We reserve the right to suspend or terminate accounts that violate these rules.</p>
+
+      <h2>8. Intellectual Property</h2>
+      <p>All platform content — including logos, designs, text, graphics, software, and branding — is owned by Planning Center or its licensors and protected by applicable intellectual property laws. Users may not reproduce, distribute, or exploit platform content without permission.</p>
+
+      <h2>9. Limitation of Liability</h2>
+      <p>To the maximum extent permitted by law, we are not liable for indirect damages, loss of profits, business interruption, event organizer actions, or event cancellations beyond our control. Our total liability shall not exceed the amount paid by the user for the relevant event registration.</p>
+
+      <h2>10. Force Majeure</h2>
+      <p>We are not responsible for delays or failures caused by events beyond reasonable control, including:</p>
+      <ul>
+        <li>Natural disasters</li>
+        <li>Government actions</li>
+        <li>Public health emergencies</li>
+        <li>Internet outages</li>
+        <li>Civil unrest</li>
+      </ul>
+
+      <h2>11. Termination</h2>
+      <p>We may suspend or terminate access to the platform if terms are violated, fraudulent activity is suspected, or required by law.</p>
+
+      <h2>12. Governing Law</h2>
+      <p>These Terms and Conditions shall be governed by the laws of the Kingdom of Cambodia unless otherwise required by applicable law. Any disputes shall first be addressed through good-faith negotiations before pursuing legal remedies.</p>
+
+    </div>
+
+    <!-- Contact box -->
+    <div class="legal-contact-box">
+      <h2>13. Contact Information</h2>
+      <p style="margin-bottom:18px">For questions regarding these Terms and Conditions:</p>
+      <div class="legal-contact-row">
+        <i class="ri-mail-line"></i>
+        <span>Email: <a href="mailto:support@planningcenter.com">support@planningcenter.com</a></span>
+      </div>
+      <div class="legal-contact-row">
+        <i class="ri-global-line"></i>
+        <span>Website: <a href="/">planningcenter.com</a></span>
+      </div>
+      <div class="legal-contact-row">
+        <i class="ri-map-pin-line"></i>
+        <span>Russian Federation Blvd, Phnom Penh, Cambodia</span>
+      </div>
+    </div>
+  </main>
+
+  <script src="/assets/js/1_navbar.js"></script>
+  <script src="/assets/js/7_cursor.js"></script>
+</body>
+</html>

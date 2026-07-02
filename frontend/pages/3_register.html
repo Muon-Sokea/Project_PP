@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Planning Center — Create Account</title>
+
+  <!-- Apply saved theme before paint (no flash) -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("erms_theme") || "auto";
+        if (t === "dark" || (t === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+          document.documentElement.classList.add("dark");
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/9_auth-gm.css" />
+  <style>
+    .terms-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--input-text, #374151);
+      margin-bottom: 4px;
+      cursor: pointer;
+      line-height: 1.5;
+    }
+    .terms-row input[type="checkbox"] {
+      margin-top: 2px;
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      accent-color: var(--primary, #F59E0B);
+      cursor: pointer;
+    }
+    .terms-link {
+      color: var(--primary, #F59E0B);
+      text-decoration: underline;
+      font-weight: 500;
+    }
+    .terms-error {
+      font-size: 12px;
+      color: #ef4444;
+      margin-bottom: 12px;
+      min-height: 18px;
+    }
+    #termsLabel.invalid-terms .terms-row span { color: #ef4444; }
+
+    .verify-card { text-align: center; }
+    .verify-icon {
+      width: 64px; height: 64px;
+      background: rgba(245,158,11,0.12);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 28px;
+      color: var(--primary, #F59E0B);
+    }
+    .verify-card .field { text-align: left; }
+  </style>
+</head>
+<body>
+
+  <!-- Glass header -->
+  <header class="gm-header">
+    <a class="gm-logo" href="/pages/1_index.html" aria-label="Planning Center home">
+      <span class="t">Planning</span>
+      <span class="b">Center</span>
+    </a>
+    <div class="gm-actions">
+      <button class="gm-btn ghost" onclick="location.href='/pages/2_login.html'">Sign in</button>
+      <button class="gm-btn solid" aria-current="page">Sign up</button>
+    </div>
+  </header>
+
+  <main class="gm-main">
+    <div class="card">
+      <h1>Create account</h1>
+      <p class="sub">Join Planning Center to register for events</p>
+
+      <form id="gmRegisterForm" novalidate>
+
+        <!-- First & Last name -->
+        <div class="name-row">
+          <div class="field">
+            <input type="text" id="regFirstName" placeholder=" " autocomplete="given-name" required />
+            <label for="regFirstName">First name</label>
+            <i class="ri-check-line valid-tick" aria-hidden="true"></i>
+            <div class="field-error" role="alert"></div>
+          </div>
+          <div class="field">
+            <input type="text" id="regLastName" placeholder=" " autocomplete="family-name" required />
+            <label for="regLastName">Last name</label>
+            <i class="ri-check-line valid-tick" aria-hidden="true"></i>
+            <div class="field-error" role="alert"></div>
+          </div>
+        </div>
+
+        <!-- Email -->
+        <div class="field">
+          <input type="email" id="regEmail" placeholder=" " autocomplete="email" required />
+          <label for="regEmail">Email address</label>
+          <i class="ri-check-line valid-tick" aria-hidden="true"></i>
+          <div class="field-error" role="alert"></div>
+        </div>
+
+        <!-- Phone -->
+        <div class="field">
+          <input type="tel" id="regPhone" placeholder=" " autocomplete="tel" required />
+          <label for="regPhone">Phone number</label>
+          <i class="ri-check-line valid-tick" aria-hidden="true"></i>
+          <div class="field-error" role="alert"></div>
+        </div>
+
+        <!-- Address (optional) -->
+        <div class="field">
+          <input type="text" id="regAddress" placeholder=" " autocomplete="street-address" />
+          <label for="regAddress">Address (optional)</label>
+        </div>
+
+        <!-- Password -->
+        <div class="field">
+          <input type="password" id="regPassword" placeholder=" " autocomplete="new-password" required />
+          <label for="regPassword">Password</label>
+          <button type="button" class="pw-toggle" aria-label="Show password">
+            <i class="ri-eye-line" aria-hidden="true"></i>
+          </button>
+          <div class="field-error" role="alert"></div>
+        </div>
+        <div class="pw-strength" id="pwStrength" aria-live="polite">
+          <div class="pw-bars"><span></span><span></span><span></span></div>
+          <span class="pw-label"></span>
+        </div>
+
+        <!-- Confirm password -->
+        <div class="field">
+          <input type="password" id="regConfirmPassword" placeholder=" " autocomplete="new-password" required />
+          <label for="regConfirmPassword">Confirm password</label>
+          <button type="button" class="pw-toggle" aria-label="Show password">
+            <i class="ri-eye-line" aria-hidden="true"></i>
+          </button>
+          <div class="field-error" role="alert"></div>
+        </div>
+
+        <!-- Terms & Conditions -->
+        <label class="terms-row" id="termsLabel">
+        <input type="checkbox" id="regTerms" />
+        <span>I agree to the <a href="/pages/14_terms-and-conditions.html" class="terms-link" target="_blank">Terms &amp; Conditions</a> and <a href="/pages/13_privacy-policy.html" class="terms-link" target="_blank">Privacy Policy</a></span>
+  </label>
+        <div class="field-error terms-error" id="termsError" role="alert"></div>
+
+        <button type="submit" class="cta" id="ctaBtn">
+          <span class="spinner" aria-hidden="true"></span>
+          <span class="label">Create account</span>
+          <span class="check" aria-hidden="true"><i class="ri-check-line"></i></span>
+        </button>
+      </form>
+
+      <div class="divider-or"><span>or sign up with</span></div>
+
+      <div class="social-row">
+        <button class="social-btn" onclick="socialComingSoon(this)" aria-label="Sign up with Google">
+          <svg viewBox="0 0 48 48" aria-hidden="true">
+            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+          </svg>
+          Google
+        </button>
+        <button class="social-btn" onclick="socialComingSoon(this)" aria-label="Sign up with Facebook">
+          <i class="ri-facebook-fill" style="color:#1877F2;font-size:18px" aria-hidden="true"></i>
+          Facebook
+        </button>
+        <button class="social-btn" onclick="socialComingSoon(this)" aria-label="Sign up with Telegram">
+          <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true">
+            <circle cx="24" cy="24" r="24" fill="#2AABEE"/>
+            <path fill="#fff" d="M35.5 13.3L8.9 23.6c-1.5.6-1.5 1.4-.3 1.8l6.7 2.1 15.5-9.8c.7-.4 1.4-.2.9.3L18.2 29.2l-.6 7c.8 0 1.2-.4 1.6-.8l3.8-3.7 7 5.2c1.3.7 2.2.3 2.5-1.2l4.5-21.2c.5-1.9-.7-2.8-1.5-2.2z"/>
+          </svg>
+          Telegram
+        </button>
+      </div>
+
+      <p class="foot">Already have an account? <a href="/pages/2_login.html">Sign in</a></p>
+    </div>
+
+    <!-- Email verification overlay (shown after successful registration) -->
+    <div class="card verify-card" id="verifyCard" style="display:none;">
+      <div class="verify-icon">
+        <i class="ri-mail-check-line"></i>
+      </div>
+      <h1>Check your email</h1>
+      <p class="sub">We sent a 6-digit code to <strong id="verifyEmailDisplay"></strong></p>
+
+      <div class="field" style="margin-top:24px;">
+        <input type="text" id="verifyCode" placeholder=" " maxlength="6"
+          inputmode="numeric" autocomplete="one-time-code" style="letter-spacing:6px;font-size:22px;text-align:center;" />
+        <label for="verifyCode">Verification code</label>
+        <div class="field-error" id="verifyError" role="alert"></div>
+      </div>
+
+      <button class="cta" id="verifyBtn" onclick="submitVerifyCode()">
+        <span class="spinner" aria-hidden="true"></span>
+        <span class="label">Verify email</span>
+        <span class="check" aria-hidden="true"><i class="ri-check-line"></i></span>
+      </button>
+
+      <p style="margin-top:16px;font-size:13px;color:var(--text-light);">
+        Didn't get it?
+        <a href="javascript:void(0)" id="resendLink" onclick="resendOtp()" style="color:var(--primary);font-weight:600;">Resend code</a>
+        <span id="resendCountdown"></span>
+      </p>
+    </div>
+    </div>
+  </main>
+
+  <!-- 3_auth.js provides shared helpers (saveSession, loadAttendees, isValidEmail,
+       isValidPhone, specificUsers) and the "already logged in" redirect. The form id
+       here is gmRegisterForm so 3_auth.js does NOT bind its own handler — this page
+       drives the richer submit UX below. -->
+
+  <script src="/assets/js/0_api.js"></script>
+  <script type="module" src="/assets/js/3_auth.js"></script>
+  <script type="module">
+    import { apiVerifyEmail, apiResendOtp } from '/assets/js/Fakedata/api.js';
+
+    function socialComingSoon(btn) {
+      var name = btn.getAttribute("aria-label").replace("Sign up with ", "");
+      alert(name + " sign-up is coming soon!");
+    }
+
+    // ── Email verification ──
+    var _resendTimer = null;
+
+    function startResendCountdown() {
+      var link = document.getElementById("resendLink");
+      var countdown = document.getElementById("resendCountdown");
+      var secs = 60;
+      link.style.pointerEvents = "none";
+      link.style.opacity = "0.4";
+      clearInterval(_resendTimer);
+      _resendTimer = setInterval(function () {
+        secs--;
+        countdown.textContent = " (" + secs + "s)";
+        if (secs <= 0) {
+          clearInterval(_resendTimer);
+          countdown.textContent = "";
+          link.style.pointerEvents = "";
+          link.style.opacity = "";
+        }
+      }, 1000);
+    }
+
+    async function submitVerifyCode() {
+      var code = document.getElementById("verifyCode").value.trim();
+      var errEl = document.getElementById("verifyError");
+      var btn   = document.getElementById("verifyBtn");
+      errEl.textContent = "";
+      if (!/^\d{6}$/.test(code)) {
+        errEl.textContent = "Enter the 6-digit code from your email.";
+        return;
+      }
+      btn.classList.add("loading");
+      btn.disabled = true;
+      try {
+        await apiVerifyEmail(window._verifyUserId, code);
+        btn.classList.add("success");
+        if (typeof confetti === "function") confetti();
+        setTimeout(function () { window.location.href = "/"; }, 1200);
+      } catch (err) {
+        errEl.textContent = err.message || String(err);
+      } finally {
+        btn.classList.remove("loading");
+        btn.disabled = false;
+      }
+    }
+
+    async function resendOtp() {
+      var errEl = document.getElementById("verifyError");
+      try {
+        await apiResendOtp(window._verifyUserId);
+        errEl.textContent = "";
+        startResendCountdown();
+      } catch (err) {
+        errEl.textContent = err.message || String(err);
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+      // Clear legacy demo localStorage data so it never blocks real API calls
+      localStorage.removeItem("erms_attendees");
+
+      // Allow pressing Enter in the code field
+      var codeInput = document.getElementById("verifyCode");
+      if (codeInput) {
+        codeInput.addEventListener("keydown", function (e) {
+          if (e.key === "Enter") submitVerifyCode();
+        });
+      }
+    });
+
+    window.socialComingSoon  = socialComingSoon;
+    window.submitVerifyCode  = submitVerifyCode;
+    window.resendOtp         = resendOtp;
+  </script>
+  <script type="module">
+  import { apiRegister } from '/assets/js/Fakedata/api.js';
+  (function () {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const $ = (id) => document.getElementById(id);
+    const form = $("gmRegisterForm");
+    if (!form) return;
+
+    const F = {
+      first:   $("regFirstName"), last: $("regLastName"),
+      email:   $("regEmail"),     phone: $("regPhone"),
+      address: $("regAddress"),   pw: $("regPassword"), confirm: $("regConfirmPassword")
+    };
+
+    // ── Reuse 3_auth.js helpers when present, with safe fallbacks ──
+    const emailOk = (v) => (typeof isValidEmail === "function") ? isValidEmail(v)
+      : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+    const phoneOk = (v) => {
+      if (typeof isValidPhone === "function") return isValidPhone(v);
+      const c = v.replace(/[\s\-\+]/g, "");
+      const l = c.startsWith("855") ? c.slice(3) : c;
+      return /^[0-9]{8,11}$/.test(l);
+    };
+
+    const touched = {};
+
+    // ── Per-field validation ──
+    function check(name) {
+      const el = F[name];
+      if (!el) return true;
+      const v = el.value.trim();
+      let ok = true, msg = "";
+      switch (name) {
+        case "first":   ok = !!v; msg = "First name is required."; break;
+        case "last":    ok = !!v; msg = "Last name is required."; break;
+        case "email":   ok = !!v && emailOk(v); msg = !v ? "Email is required." : "Enter a valid email address."; break;
+        case "phone":   ok = !!v && phoneOk(v); msg = !v ? "Phone number is required." : "Enter a valid phone number."; break;
+        case "pw":      ok = el.value.length >= 8; msg = "Password must be at least 8 characters."; break;
+        case "confirm": ok = !!el.value && el.value === F.pw.value;
+                        msg = !el.value ? "Please confirm your password." : "Passwords do not match."; break;
+      }
+      setState(el, ok, msg);
+      return ok;
+    }
+
+    function setState(el, ok, msg) {
+      const field = el.closest(".field");
+      const errEl = field.querySelector(".field-error");
+      field.classList.toggle("valid", ok && el.value.trim() !== "");
+      field.classList.toggle("invalid", !ok);
+      if (errEl) errEl.textContent = ok ? "" : msg;
+    }
+
+    function shake(el) {
+      if (reduce) return;
+      const field = el.closest(".field");
+      field.classList.remove("shaking");
+      void field.offsetWidth;          // reflow so the animation can replay
+      field.classList.add("shaking");
+    }
+
+    $("regTerms").addEventListener("change", () => {
+      if ($("regTerms").checked) $("termsError").textContent = "";
+    });
+
+    ["first", "last", "email", "phone", "pw", "confirm"].forEach((name) => {
+      const el = F[name];
+      if (!el) return;
+      el.addEventListener("blur", () => { touched[name] = true; if (!check(name)) shake(el); });
+      el.addEventListener("input", () => {
+        if (touched[name]) check(name);
+        if (name === "pw") { updateStrength(); if (touched.confirm) check("confirm"); }
+      });
+    });
+
+    // ── Password strength ──
+    const strEl = $("pwStrength");
+    function pwInfo(pw) {
+      if (!pw) return null;
+      let s = 0;
+      if (pw.length >= 8) s++;
+      if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) s++;
+      if (/\d/.test(pw)) s++;
+      if (/[^A-Za-z0-9]/.test(pw)) s++;
+      if (pw.length < 8 || s <= 2) return { cls: "weak", label: "Weak" };
+      if (s === 3) return { cls: "medium", label: "Medium" };
+      return { cls: "strong", label: "Strong" };
+    }
+    function updateStrength() {
+      const info = pwInfo(F.pw.value);
+      strEl.className = "pw-strength";
+      const labelEl = strEl.querySelector(".pw-label");
+      if (!info) { labelEl.textContent = ""; return; }
+      strEl.classList.add("show", info.cls);
+      labelEl.textContent = info.label;
+    }
+
+    // ── Password visibility toggles ──
+    document.querySelectorAll(".pw-toggle").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const input = btn.parentElement.querySelector("input");
+        const icon = btn.querySelector("i");
+        const show = input.type === "password";
+        input.type = show ? "text" : "password";
+        icon.className = show ? "ri-eye-off-line" : "ri-eye-line";
+        btn.setAttribute("aria-label", show ? "Hide password" : "Show password");
+      });
+    });
+
+    // ── Smooth-scroll the focused field into a comfortable position ──
+    form.addEventListener("focusin", (e) => {
+      if (!e.target.matches("input")) return;
+      const r = e.target.getBoundingClientRect();
+      if (r.top < 80 || r.bottom > window.innerHeight - 24) {
+        e.target.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" });
+      }
+    });
+
+    // ── Submit ──
+    const cta = $("ctaBtn");
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      if (cta.classList.contains("loading") || cta.classList.contains("success")) return;
+
+      const names = ["first", "last", "email", "phone", "pw", "confirm"];
+      let firstBad = null, allOk = true;
+      names.forEach((n) => {
+        touched[n] = true;
+        if (!check(n)) { allOk = false; if (!firstBad) firstBad = F[n]; }
+      });
+
+      // Terms validation
+      const termsBox = $("regTerms");
+      const termsErr = $("termsError");
+      if (!termsBox.checked) {
+        termsErr.textContent = "You must agree to the Terms & Conditions to continue.";
+        allOk = false;
+        if (!firstBad) { firstBad = termsBox; }
+      } else {
+        termsErr.textContent = "";
+      }
+
+      if (!allOk) { if (firstBad) { shake(firstBad.closest ? firstBad : F[Object.keys(F)[0]]); firstBad.focus && firstBad.focus(); } return; }
+
+      // Loading state
+      cta.classList.add("loading");
+      cta.disabled = true;
+
+      apiRegister({
+        firstName: F.first.value.trim(),
+        lastName:  F.last.value.trim(),
+        email:     F.email.value.trim(),
+        phone:     F.phone.value.trim(),
+        password:  F.pw.value,
+      }).then((data) => {
+        cta.classList.remove("loading");
+        cta.disabled = false;
+        // Switch to verification card
+        window._verifyUserId = data.user_id;
+        $("verifyEmailDisplay").textContent = data.email;
+        document.querySelector(".card:not(#verifyCard)").style.display = "none";
+        $("verifyCard").style.display = "";
+        $("verifyCode").focus();
+        startResendCountdown();
+      }).catch((err) => {
+        cta.classList.remove("loading");
+        cta.disabled = false;
+        var msg = err.message || String(err);
+        setState(F.email, false, msg);
+        shake(F.email);
+      });
+    });
+
+    // ── Lightweight canvas confetti (≈1.5s) ──
+    function confetti() {
+      if (reduce) return;
+      const c = document.createElement("canvas");
+      c.style.cssText = "position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:9999";
+      c.width = window.innerWidth;
+      c.height = window.innerHeight;
+      document.body.appendChild(c);
+      const ctx = c.getContext("2d");
+      const colors = ["#F59E0B", "#FB923C", "#1E3A5F", "#FDE68A", "#16A34A"];
+      const parts = [];
+      for (let i = 0; i < 140; i++) {
+        parts.push({
+          x: window.innerWidth / 2, y: window.innerHeight * 0.4,
+          vx: (Math.random() - 0.5) * 12, vy: Math.random() * -12 - 4,
+          g: 0.35 + Math.random() * 0.2, s: 5 + Math.random() * 6,
+          rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.4,
+          col: colors[(i * 7) % colors.length]
+        });
+      }
+      const start = performance.now();
+      function frame(t) {
+        const dt = t - start;
+        ctx.clearRect(0, 0, c.width, c.height);
+        parts.forEach((p) => {
+          p.vy += p.g; p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+          ctx.save();
+          ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+          ctx.globalAlpha = Math.max(0, 1 - dt / 1500);
+          ctx.fillStyle = p.col;
+          ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.6);
+          ctx.restore();
+        });
+        if (dt < 1500) requestAnimationFrame(frame);
+        else c.remove();
+      }
+      requestAnimationFrame(frame);
+    }
+  })();
+  </script>
+  <script src="/assets/js/8_auth-doodle.js"></script>
+  <script src="/assets/js/7_cursor.js"></script>
+</body>
+</html>

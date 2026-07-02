@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Planning Center — Event Detail</title>
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="/assets/css/1_global.css" />
+  <link rel="stylesheet" href="/assets/css/2_navbar.css" />
+  <style>
+    .detail-page{max-width:1100px;margin:0 auto;padding:28px 24px}
+    .back-link{display:inline-flex;align-items:center;gap:6px;font-size:14px;color:var(--text-medium);margin-bottom:14px;transition:color .15s}
+    .back-link:hover{color:var(--primary)}
+    .detail-top{display:flex;gap:24px;background:var(--bg-white);border:1px solid var(--border);border-radius:var(--border-radius-lg);overflow:hidden;margin-bottom:20px}
+    .detail-img{width:420px;min-width:420px;height:260px;position:relative;background:var(--border);overflow:hidden}
+    .detail-img img{width:100%;height:100%;object-fit:cover}
+    .detail-img-grad{position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,0.55),transparent 70%);pointer-events:none}
+    .detail-cat-glass{position:absolute;top:12px;right:12px;background:rgba(0,0,0,0.45);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);color:#fff;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;z-index:1}
+    .detail-price-tag{position:absolute;top:12px;left:12px;background:rgba(0,0,0,0.55);color:#fff;font-size:14px;font-weight:700;padding:4px 12px;border-radius:6px;z-index:1}
+    .detail-info{flex:1;padding:24px 20px;display:flex;flex-direction:column;justify-content:space-between}
+    .detail-info h1{font-size:22px;font-weight:700;margin-bottom:14px;min-height:2.8em;line-height:1.4em}
+    .detail-meta-list{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;min-height:2.8em;padding:4px 0}
+    .detail-meta-item{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text-medium)}
+    .detail-meta-item i{color:var(--primary);font-size:16px}
+    .loc-link{color:var(--text-medium);display:inline-flex;align-items:center;gap:6px;text-decoration:none}
+    .loc-link:hover{color:var(--primary);text-decoration:underline}
+    .loc-link .ri-external-link-line{font-size:12px}
+    .avail-row{display:flex;justify-content:space-between;font-size:13px;color:var(--text-light);margin-bottom:6px}
+    .avail-bar{height:6px;background:var(--border);border-radius:3px;margin-bottom:16px;overflow:hidden}
+    .avail-fill{height:100%;background:var(--success);border-radius:3px;transition:width .4s ease}
+    .detail-actions{display:flex;gap:10px;align-items:center}
+    .share-btn{width:44px;height:44px;border-radius:8px;border:1px solid var(--border);background:var(--bg-white);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;color:var(--text-medium);transition:border-color .15s,color .15s}
+    .share-btn:hover{border-color:var(--primary);color:var(--primary)}
+    .detail-bottom{display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start}
+    .detail-left{display:flex;flex-direction:column;gap:16px}
+    .detail-section{background:var(--bg-white);border:1px solid var(--border);border-radius:var(--border-radius-lg);padding:20px 24px}
+    .detail-section-title{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:700;color:var(--text-dark);margin-bottom:12px}
+    .icon-circle{width:30px;height:30px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+    .detail-section p{font-size:14px;color:var(--text-medium);line-height:1.8}
+    .highlights-list{display:flex;flex-direction:column;gap:10px}
+    .highlight-item{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text-medium)}
+    .highlight-check{width:20px;height:20px;border-radius:4px;background:var(--primary-light);color:var(--success);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .detail-right{display:flex;flex-direction:column;gap:16px;position:sticky;top:24px}
+    .organizer-card{background:var(--bg-white);border:1px solid var(--border);border-radius:var(--border-radius-lg);padding:20px}
+    .organizer-card h3{font-size:16px;font-weight:700;margin-bottom:14px}
+    .organizer-field{margin-bottom:12px}
+    .organizer-field .f-label{font-size:12px;color:var(--text-light);margin-bottom:2px}
+    .organizer-field .f-value{font-size:14px;font-weight:600;color:var(--text-dark);display:block}
+    .organizer-field a.f-value{color:var(--primary);text-decoration:none}
+    .organizer-field a.f-value:hover{text-decoration:underline}
+    .join-card{background:var(--primary-light);border:1px solid var(--primary-border);border-radius:var(--border-radius-lg);padding:20px;text-align:center}
+    .join-card h3{font-size:17px;font-weight:700;color:var(--text-dark);margin-bottom:8px}
+    .join-card p{font-size:13px;color:var(--text-medium);margin-bottom:16px;line-height:1.6}
+    .share-save-row{display:flex;gap:10px}
+    .share-save-row .btn{flex:1}
+    .btn.saved{background:var(--primary);color:#fff;border-color:var(--primary)}
+    .toast{position:fixed;top:80px;right:24px;background:var(--text-dark);color:#fff;padding:12px 18px;border-radius:10px;font-size:14px;box-shadow:var(--shadow-lg);opacity:0;transform:translateY(-10px);transition:opacity .25s,transform .25s;z-index:9998;pointer-events:none}
+    .toast.show{opacity:1;transform:translateY(0)}
+    a:focus-visible,button:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+    /* Highlights as feature cards */
+    .hl-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .hl-card{background:var(--bg-orange);border-radius:var(--border-radius);padding:14px 16px}
+    .hl-card .hl-icon{color:var(--primary);font-size:20px;margin-bottom:6px}
+    .hl-card .hl-title{font-size:14px;font-weight:700;color:var(--text-dark);margin-bottom:2px}
+    .hl-card .hl-desc{font-size:12px;color:var(--text-light);line-height:1.5}
+    /* Agenda timeline */
+    .agenda-tabs{display:flex;gap:18px;border-bottom:1px solid var(--border);margin-bottom:16px}
+    .agenda-tab{padding:8px 2px;background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;font-family:var(--font);font-size:14px;font-weight:600;color:var(--text-light);cursor:pointer}
+    .agenda-tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+    .agenda-timeline{position:relative;padding-left:22px}
+    .agenda-timeline::before{content:"";position:absolute;left:5px;top:4px;bottom:4px;border-left:2px dashed var(--border)}
+    .agenda-item{position:relative;margin-bottom:16px}
+    .agenda-item:last-child{margin-bottom:0}
+    .agenda-item::before{content:"";position:absolute;left:-22px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--primary);box-shadow:0 0 0 3px var(--bg-white)}
+    .agenda-time{font-size:12px;color:var(--text-light);margin-bottom:4px}
+    .agenda-card{background:var(--bg-white);border:1px solid var(--border);border-radius:var(--border-radius);padding:12px 14px}
+    .agenda-card .a-title{font-size:14px;font-weight:700;color:var(--text-dark)}
+    .agenda-card .a-sub{font-size:12px;color:var(--text-light);margin-top:2px}
+    .agenda-tag{display:inline-block;margin-top:8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--primary);background:var(--primary-light);padding:2px 8px;border-radius:20px}
+    /* Speakers */
+    .speakers-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+    .speaker{text-align:center}
+    .sp-avatar{position:relative;width:72px;height:72px;border-radius:50%;margin:0 auto 10px;background:linear-gradient(135deg,var(--primary),#FB923C);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;box-shadow:0 0 0 3px var(--bg-white),0 0 0 5px var(--primary-light)}
+    .sp-avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
+    .sp-name{font-size:14px;font-weight:700;color:var(--text-dark)}
+    .sp-title{font-size:12px;color:var(--text-light)}
+    .sp-company{font-size:12px;color:var(--primary);font-weight:600}
+    /* Venue */
+    .venue-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch}
+    .venue-name{font-size:15px;font-weight:700;color:var(--primary);margin-bottom:6px}
+    .venue-addr{font-size:13px;color:var(--text-medium);line-height:1.6;margin-bottom:12px}
+    .venue-feat{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-medium);margin-bottom:6px}
+    .venue-feat i{color:var(--success)}
+    .venue-map{display:flex;align-items:center;justify-content:center;min-height:150px;background:var(--bg-light);border:1px solid var(--border);border-radius:var(--border-radius);color:var(--primary);font-weight:600;text-decoration:none;gap:8px;transition:border-color .15s}
+    .venue-map:hover{border-color:var(--primary)}
+    @media(max-width:560px){.hl-grid,.venue-grid{grid-template-columns:1fr}.speakers-grid{grid-template-columns:1fr 1fr}}
+    @media(max-width:900px){
+      .detail-top{flex-direction:column}
+      .detail-img{width:100%;min-width:unset;height:220px}
+      .detail-bottom{grid-template-columns:1fr}
+      .detail-right{position:static}
+    }
+    .divider {
+      height: 1px;
+      background-color: var(--border);
+      margin: 8px 0;
+      width: 100%;
+    }
+    .price-row {
+      border-top: 1px solid var(--border);
+      margin-top: 16px;
+      padding-top: 16px;
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar">
+    <a class="nav-logo" href="/pages/1_index.html">
+      <span class="logo-top">Planning</span>
+      <span class="logo-bottom">Center</span>
+    </a>
+    <button class="hamburger" id="hamburger">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="nav-links" id="navLinks">
+      <button class="btn btn-primary"
+        onclick="location.href='/'">
+        <i class="ri-home-line"></i> Home
+      </button>
+      <button class="btn btn-outline" onclick="goToDashboard()">
+        <i class="ri-dashboard-line"></i> Dashboard
+      </button>
+      <button class="btn btn-outline" onclick="logout()">
+        <i class="ri-logout-box-r-line"></i> Logout
+      </button>
+    </div>
+  </nav>
+
+  <main class="detail-page">
+    <a class="back-link" href="/pages/1_index.html">
+      <i class="ri-arrow-left-line" aria-hidden="true"></i> All Events
+    </a>
+
+    <div class="detail-top">
+      <div class="detail-img">
+        <img id="detailImage" src="/assets/images/Sport%20event.jpg" alt="Event"/>
+        <div class="detail-img-grad" aria-hidden="true"></div>
+        <span class="detail-cat-glass" id="detailCategory">Technology</span>
+        <div class="detail-price-tag">$<span id="detailPrice">250</span></div>
+      </div>
+      <div class="detail-info">
+        <div>
+          <h1 id="detailTitle">Tech Innovation Summit 2026</h1>
+          <div class="detail-meta-list">
+            <div class="detail-meta-item">
+              <i class="ri-calendar-line" aria-hidden="true"></i>
+              <span id="detailDate">October 30, 2026</span>
+            </div>
+            <div class="detail-meta-item">
+              <i class="ri-time-line" aria-hidden="true"></i>
+              <span id="detailTime">9:00 AM - 5:00 PM</span>
+            </div>
+            <div class="detail-meta-item">
+              <i class="ri-map-pin-line" aria-hidden="true"></i>
+              <a id="detailLocationLink" class="loc-link" href="#" target="_blank" rel="noopener">
+                <span id="detailLocation">Prey Veng Province</span>
+                <i class="ri-external-link-line" aria-hidden="true"></i>
+              </a>
+            </div>
+          </div>
+          <div class="price-row">
+            <div class="detail-meta-item">
+              <i class="ri-price-tag-3-line" aria-hidden="true"></i>
+              <span>$<span id="detailPriceMeta">250</span> per ticket</span>
+            </div>
+            <div class="detail-meta-item">
+              <i class="ri-group-line" aria-hidden="true"></i>
+              <span id="detailAttending">1000 / 2300 attendees</span>
+            </div>
+          </div>
+          <div class="avail-row">
+            <span>Availability</span>
+            <span id="seatsLeft">1300 seats left</span>
+          </div>
+          <div class="avail-bar">
+            <div class="avail-fill" id="availFill" style="width:43%"></div>
+          </div>
+        </div>
+        <div class="detail-actions">
+          <button class="btn btn-primary reg-btn" style="flex:1"
+            id="registerBtn" onclick="goRegister()">
+            Register Now
+          </button>
+          <button class="share-btn" id="calBtn" aria-label="Add to calendar"
+            title="Add to calendar" onclick="addToCalendar()">
+            <i class="ri-calendar-2-line" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-bottom">
+      <div class="detail-left">
+        <div class="detail-section">
+          <div class="detail-section-title">
+            <div class="icon-circle"><i class="ri-information-line" aria-hidden="true"></i></div>
+            About This Event
+          </div>
+          <p id="detailAbout">
+            Join us for one of the standout events of 2026. Connect with
+            like-minded people, discover something new, and be part of an
+            experience worth remembering.
+          </p>
+        </div>
+        <div class="detail-section">
+          <div class="detail-section-title">
+            <div class="icon-circle"><i class="ri-star-line" aria-hidden="true"></i></div>
+            Event Highlights
+          </div>
+          <div class="highlights-list" id="highlightsList">
+            <div class="highlight-item">
+              <div class="highlight-check"><i class="ri-check-line" aria-hidden="true"></i></div>
+              Expert speakers and engaging sessions
+            </div>
+            <div class="highlight-item">
+              <div class="highlight-check"><i class="ri-check-line" aria-hidden="true"></i></div>
+              Hands-on, interactive experiences
+            </div>
+            <div class="highlight-item">
+              <div class="highlight-check"><i class="ri-check-line" aria-hidden="true"></i></div>
+              Networking with fellow attendees
+            </div>
+            <div class="highlight-item">
+              <div class="highlight-check"><i class="ri-check-line" aria-hidden="true"></i></div>
+              Exclusive announcements and demos
+            </div>
+            <div class="highlight-item">
+              <div class="highlight-check"><i class="ri-check-line" aria-hidden="true"></i></div>
+              Certificate of attendance
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-section" id="agendaSection" style="display:none">
+          <div class="detail-section-title">
+            <div class="icon-circle"><i class="ri-calendar-todo-line" aria-hidden="true"></i></div>
+            Agenda
+          </div>
+          <div class="agenda-tabs" id="agendaTabs"></div>
+          <div class="agenda-timeline" id="agendaBody"></div>
+        </div>
+
+        <div class="detail-section" id="speakersSection" style="display:none">
+          <div class="detail-section-title">
+            <div class="icon-circle"><i class="ri-user-star-line" aria-hidden="true"></i></div>
+            Featured Speakers
+          </div>
+          <div class="speakers-grid" id="speakersGrid"></div>
+        </div>
+
+        <div class="detail-section" id="venueSection" style="display:none">
+          <div class="detail-section-title">
+            <div class="icon-circle"><i class="ri-map-pin-2-line" aria-hidden="true"></i></div>
+            Venue &amp; Location
+          </div>
+          <div class="venue-grid">
+            <div>
+              <div class="venue-name" id="venueName"></div>
+              <div class="venue-addr" id="venueAddr"></div>
+              <div class="venue-feat" id="venueParking"><i class="ri-checkbox-circle-line" aria-hidden="true"></i> Free parking available</div>
+              <div class="venue-feat" id="venueAccess"><i class="ri-wheelchair-line" aria-hidden="true"></i> Wheelchair accessible</div>
+            </div>
+            <a class="venue-map" id="venueMap" href="#" target="_blank" rel="noopener">
+              <i class="ri-map-pin-line" aria-hidden="true"></i> View on Map
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-right">
+        <div class="organizer-card">
+          <h3>Organizer</h3>
+          <div class="organizer-field">
+            <div class="f-label">Organized by</div>
+            <div class="f-value">TechEvents Inc.</div>
+          </div>
+          <div class="organizer-field">
+            <div class="f-label">Email</div>
+            <a class="f-value" id="orgEmail" href="mailto:contact@techevents.com">contact@techevents.com</a>
+          </div>
+          <div class="organizer-field">
+            <div class="f-label">Phone</div>
+            <a class="f-value" id="orgPhone" href="tel:+15551234567">+1 (555) 123-4567</a>
+          </div>
+        </div>
+
+        <div class="join-card">
+          <h3>Ready to Join?</h3>
+          <p>Secure your spot today and be part of this amazing event!</p>
+          <button class="btn btn-primary btn-full reg-btn" onclick="goRegister()">
+            Register Now
+          </button>
+        </div>
+
+        <div class="share-save-row">
+          <button class="btn btn-outline" id="saveBtn" onclick="toggleSave()">
+            <i class="ri-heart-line" aria-hidden="true"></i> Save
+          </button>
+          <button class="btn btn-outline" id="shareBtn" onclick="shareEvent()">
+            <i class="ri-share-line" aria-hidden="true"></i> Share
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="/assets/js/0_api.js"></script>
+  <script src="/assets/js/1_navbar.js"></script>
+  <script src="/assets/js/2_events.js"></script>
+  <script>
+    let currentEvent = null;
+
+    document.addEventListener("DOMContentLoaded", () => {
+      currentEvent = (typeof loadEventFromStorage === "function") ? loadEventFromStorage() : null;
+      if (!currentEvent) return;
+      const ev = currentEvent;
+      const set = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
+
+      const img = document.getElementById("detailImage");
+      img.src = ev.image || "/assets/images/Sport%20event.jpg";
+      img.alt = ev.title || "Event";
+
+      set("detailCategory", ev.category);
+      set("detailTitle", ev.title);
+      set("detailDate", ev.date);
+      set("detailTime", ev.time);
+      set("detailLocation", ev.location);
+      set("detailPrice", ev.price);
+      set("detailPriceMeta", ev.price);
+      set("detailAttending",
+        ev.attending.toLocaleString() + " / " + ev.capacity.toLocaleString() + " attendees");
+      if (ev.description) set("detailAbout", ev.description);
+      document.title = "Planning Center — " + (ev.title || "Event");
+
+      // Location → Google Maps directions
+      const locLink = document.getElementById("detailLocationLink");
+      if (locLink) {
+        locLink.href = "https://www.google.com/maps/search/?api=1&query=" +
+          encodeURIComponent(ev.location || "");
+      }
+
+      // Availability
+      const seatsLeft = ev.capacity - ev.attending;
+      const fillPct = Math.min(100, Math.round((ev.attending / ev.capacity) * 100));
+      const fill = document.getElementById("availFill");
+      fill.style.width = fillPct + "%";
+
+      const isFull = ev.attending >= ev.capacity;
+
+      // Date-aware: is the event in the past?
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const evDate = new Date(ev.date);
+      const isPast = !isNaN(evDate.getTime()) && evDate < today;
+
+      fill.style.background = (isFull || isPast) ? "var(--danger)" : "var(--success)";
+      set("seatsLeft",
+        isPast ? "Event ended"
+               : (seatsLeft > 0 ? seatsLeft.toLocaleString() + " seats left" : "No seats left"));
+
+      let label = "Register Now", disabled = false, isWaitlist = false;
+      if (isPast) { label = "Event ended"; disabled = true; }
+      else if (isFull) { label = "Join Waitlist"; isWaitlist = true; }
+      document.querySelectorAll(".reg-btn").forEach((b) => {
+        b.textContent = label;
+        b.disabled = disabled;
+        b.style.opacity = disabled ? "0.6" : "";
+        b.style.cursor = disabled ? "not-allowed" : "";
+        if (isWaitlist) {
+          b.onclick = () => joinWaitlist(ev.id, ev.title);
+          b.style.background = "var(--amber, #f59e0b)";
+        }
+      });
+
+      renderHighlights(ev);
+      renderAgenda(ev);
+      renderSpeakers(ev);
+      renderVenue(ev);
+      reflectSaved();
+    });
+
+    function goRegister() {
+      showToast("Taking you to registration…");
+      setTimeout(() => {
+        window.location.href = "/pages/9_registration-payment.html";
+      }, 700);
+    }
+
+    function joinWaitlist(eventId, eventTitle) {
+      const user = JSON.parse(localStorage.getItem("erms_user") || "null");
+      if (!user) { window.location.href = "/pages/2_login.html"; return; }
+      const waitlist = JSON.parse(localStorage.getItem("erms_waitlist") || "[]");
+      const already = waitlist.some(w => w.eventId === eventId && w.userId === user.id);
+      if (already) { showToast("You're already on the waitlist!"); return; }
+      waitlist.push({ id: Date.now(), userId: user.id, eventId, eventTitle, joinedAt: new Date().toISOString(), status: "waiting" });
+      localStorage.setItem("erms_waitlist", JSON.stringify(waitlist));
+      showToast("Added to waitlist! We'll notify you when a spot opens.");
+      document.querySelectorAll(".reg-btn").forEach(b => {
+        b.textContent = "On Waitlist";
+        b.disabled = true;
+        b.style.opacity = "0.7";
+      });
+    }
+
+    // ── Rich sections (rendered only when the event has the data; else hidden) ──
+    function renderHighlights(ev) {
+      if (!ev.highlights || !ev.highlights.length) return;
+      const el = document.getElementById("highlightsList");
+      if (!el) return;
+      el.className = "hl-grid";
+      el.innerHTML = ev.highlights.map((h) =>
+        '<div class="hl-card"><div class="hl-icon"><i class="' + (h.icon || "ri-checkbox-circle-line") +
+        '" aria-hidden="true"></i></div><div class="hl-title">' + h.title +
+        '</div><div class="hl-desc">' + (h.desc || "") + '</div></div>'
+      ).join("");
+    }
+
+    let agendaData = null;
+    function renderAgenda(ev) {
+      if (!ev.agenda) return;
+      agendaData = ev.agenda;
+      const days = Object.keys(ev.agenda);
+      if (!days.length) return;
+      document.getElementById("agendaSection").style.display = "";
+      const tabs = document.getElementById("agendaTabs");
+      tabs.innerHTML = days.map((d, i) =>
+        '<button class="agenda-tab' + (i === 0 ? " active" : "") + '" data-day="' + d + '">' + d + '</button>'
+      ).join("");
+      tabs.addEventListener("click", (e) => {
+        const b = e.target.closest(".agenda-tab");
+        if (!b) return;
+        tabs.querySelectorAll(".agenda-tab").forEach((x) => x.classList.remove("active"));
+        b.classList.add("active");
+        showAgendaDay(b.dataset.day);
+      });
+      showAgendaDay(days[0]);
+    }
+    function showAgendaDay(day) {
+      const body = document.getElementById("agendaBody");
+      const items = (agendaData && agendaData[day]) || [];
+      body.innerHTML = items.map((it) =>
+        '<div class="agenda-item"><div class="agenda-time">' + (it.time || "") +
+        '</div><div class="agenda-card"><div class="a-title">' + (it.title || "") + '</div>' +
+        (it.sub ? '<div class="a-sub">' + it.sub + '</div>' : "") +
+        (it.tag ? '<span class="agenda-tag">' + it.tag + '</span>' : "") +
+        '</div></div>'
+      ).join("");
+    }
+
+    function spInitials(n) {
+      return n.split(/\s+/).map((w) => w.charAt(0)).join("").slice(0, 2).toUpperCase();
+    }
+    function renderSpeakers(ev) {
+      if (!ev.speakers || !ev.speakers.length) return;
+      document.getElementById("speakersSection").style.display = "";
+      document.getElementById("speakersGrid").innerHTML = ev.speakers.map((s) =>
+        '<div class="speaker"><div class="sp-avatar" role="img" aria-label="' + s.name + '">' +
+        '<span aria-hidden="true">' + spInitials(s.name) + '</span>' +
+        '<img src="https://api.dicebear.com/7.x/avataaars/svg?seed=' + encodeURIComponent(s.name) +
+        '" alt="" onerror="this.remove()"/></div>' +
+        '<div class="sp-name">' + s.name + '</div>' +
+        '<div class="sp-title">' + (s.title || "") + '</div>' +
+        '<div class="sp-company">' + (s.company || "") + '</div></div>'
+      ).join("");
+    }
+
+    function renderVenue(ev) {
+      if (!ev.venue) return;
+      const v = ev.venue;
+      document.getElementById("venueSection").style.display = "";
+      document.getElementById("venueName").textContent = v.name || "";
+      document.getElementById("venueAddr").textContent = v.address || ev.location || "";
+      document.getElementById("venueParking").style.display = v.parking ? "" : "none";
+      document.getElementById("venueAccess").style.display = v.accessibility ? "" : "none";
+      document.getElementById("venueMap").href =
+        "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(v.address || ev.location || "");
+    }
+
+    // ── Save event (localStorage) ──
+    function savedList() {
+      try { return JSON.parse(localStorage.getItem("erms_saved_events") || "[]"); }
+      catch (e) { return []; }
+    }
+    function reflectSaved() {
+      const btn = document.getElementById("saveBtn");
+      if (!btn || !currentEvent) return;
+      const saved = savedList().includes(currentEvent.id);
+      btn.classList.toggle("saved", saved);
+      btn.innerHTML = saved
+        ? '<i class="ri-heart-fill" aria-hidden="true"></i> Saved'
+        : '<i class="ri-heart-line" aria-hidden="true"></i> Save';
+    }
+    function toggleSave() {
+      if (!currentEvent) return;
+      let list = savedList();
+      if (list.includes(currentEvent.id)) {
+        list = list.filter((id) => id !== currentEvent.id);
+        showToast("Removed from saved");
+      } else {
+        list.push(currentEvent.id);
+        showToast("❤ Saved to your list");
+      }
+      localStorage.setItem("erms_saved_events", JSON.stringify(list));
+      reflectSaved();
+    }
+
+    // ── Share ──
+    function shareEvent() {
+      const url = location.href;
+      if (navigator.share) {
+        navigator.share({ title: document.title, url: url }).catch(() => {});
+        return;
+      }
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(url)
+          .then(() => showToast("🔗 Link copied"))
+          .catch(() => showToast(url));
+      } else {
+        showToast(url);
+      }
+    }
+
+    // ── Add to Calendar (downloadable .ics) ──
+    function pad(n) { return String(n).padStart(2, "0"); }
+    function fmtICS(d) {
+      return d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) +
+        "T" + pad(d.getHours()) + pad(d.getMinutes()) + "00";
+    }
+    function addToCalendar() {
+      if (!currentEvent) return;
+      const ev = currentEvent;
+      const base = new Date(ev.date);
+      if (isNaN(base.getTime())) { showToast("Couldn't read the event date"); return; }
+      let start = new Date(base), end = new Date(base);
+      const m = (ev.time || "").match(/(\d+):(\d+)\s*(AM|PM)\s*-\s*(\d+):(\d+)\s*(AM|PM)/i);
+      if (m) {
+        const sh = (+m[1] % 12) + (/pm/i.test(m[3]) ? 12 : 0);
+        const eh = (+m[4] % 12) + (/pm/i.test(m[6]) ? 12 : 0);
+        start.setHours(sh, +m[2], 0);
+        end.setHours(eh, +m[5], 0);
+      } else {
+        start.setHours(9, 0, 0); end.setHours(17, 0, 0);
+      }
+      const ics = [
+        "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Planning Center//Events//EN",
+        "BEGIN:VEVENT",
+        "UID:" + (ev.id || "evt") + "@planningcenter",
+        "DTSTART:" + fmtICS(start),
+        "DTEND:" + fmtICS(end),
+        "SUMMARY:" + (ev.title || "Event"),
+        "LOCATION:" + (ev.location || ""),
+        "DESCRIPTION:" + ((ev.category || "") + " event via Planning Center"),
+        "END:VEVENT", "END:VCALENDAR"
+      ].join("\r\n");
+      const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = (ev.title || "event").replace(/[^\w]+/g, "_") + ".ics";
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      showToast("📅 Calendar file downloaded");
+    }
+
+    // ── Toast ──
+    let toastTimer = 0;
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      if (!t) return;
+      t.textContent = msg;
+      t.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => t.classList.remove("show"), 2200);
+    }
+  </script>
+  <script src="/assets/js/7_cursor.js"></script>
+</body>
+</html>

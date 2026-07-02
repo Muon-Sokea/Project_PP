@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Create New Event - Planning Center</title>
+<script>
+  (function(){try{var t=localStorage.getItem("erms_theme")||"auto";if(t==="dark"||(t==="auto"&&window.matchMedia("(prefers-color-scheme: dark)").matches)){document.documentElement.classList.add("dark");}}catch(e){}}());
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --primary: #f59e0b;
+        --primary-hover: #d97706;
+        --primary-light: #fff7ed;
+        --bg: #f8fafc;
+        --card-bg: #ffffff;
+        --text-main: #1e293b;
+        --text-muted: #64748b;
+        --border: #e2e8f0;
+        --success: #10b981;
+        --danger: #ef4444;
+    }
+    html.dark, body.dark {
+        --primary: #e8b15a;
+        --primary-hover: #d49b3f;
+        --primary-light: #2a2438;
+        --bg: #15151f;
+        --card-bg: #1e1e2e;
+        --text-main: #f2f2f7;
+        --text-muted: #c2c2d4;
+        --border: #32324a;
+        --success: #28a745;
+        --danger: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text-main); line-height: 1.5; }
+
+    /* Header */
+    header { background: var(--card-bg); border-bottom: 1px solid var(--border); padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+    .header-left { display: flex; align-items: center; gap: 1rem; }
+    .back-btn { width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; transition: all 0.2s; }
+    .back-btn:hover { background: var(--bg); }
+    .logo { font-size: 1.5rem; font-weight: 700; color: var(--primary); font-style: italic; }
+    .header-right { display: flex; align-items: center; gap: 1rem; }
+    .btn-secondary { padding: 0.6rem 1.2rem; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); cursor: pointer; font-weight: 500; transition: all 0.2s; color: var(--text-main); }
+    .btn-secondary:hover { background: var(--bg); }
+    .btn-demo { padding: 0.6rem 1.2rem; border: 1px solid var(--primary); border-radius: 8px; background: var(--primary-light); color: var(--primary-hover); cursor: pointer; font-weight: 600; transition: all 0.2s; }
+    .btn-demo:hover { background: var(--primary-light); filter: brightness(0.95); }
+    .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--border); color: var(--text-main); display: flex; align-items: center; justify-content: center; font-weight: 600; cursor: pointer; }
+
+    /* Layout */
+    .container { max-width: 1000px; margin: 2rem auto; padding: 0 2rem; }
+
+    /* Progress Steps */
+    .progress-bar { display: flex; justify-content: space-between; margin-bottom: 2rem; position: relative; }
+    .progress-bar::before { content: ''; position: absolute; top: 20px; left: 0; right: 0; height: 2px; background: var(--border); z-index: 0; }
+    .progress-line { position: absolute; top: 20px; left: 0; height: 2px; background: var(--primary); z-index: 1; transition: width 0.3s; }
+    .step { position: relative; z-index: 2; text-align: center; flex: 1; }
+    .step-circle { width: 40px; height: 40px; border-radius: 50%; background: var(--card-bg); color: var(--text-main); border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; margin: 0 auto 0.5rem; font-weight: 600; transition: all 0.3s; }
+    .step.active .step-circle { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .step.completed .step-circle { background: var(--success); border-color: var(--success); color: #fff; }
+    .step-label { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; }
+    .step.active .step-label { color: var(--primary); font-weight: 600; }
+
+    /* Form Card */
+    .form-card { background: var(--card-bg); border-radius: 12px; padding: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid var(--border); margin-bottom: 1.5rem; }
+    .form-section { display: none; }
+    .form-section.active { display: block; animation: fadeIn 0.3s; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .section-title { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .section-subtitle { color: var(--text-muted); margin-bottom: 2rem; font-size: 0.95rem; }
+
+    /* Form Elements */
+    .form-group { margin-bottom: 1.5rem; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    label { display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem; }
+    input[type="text"], input[type="number"], input[type="date"], input[type="time"], input[type="email"], input[type="tel"], select, textarea {
+        width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; font-family: inherit; transition: border-color 0.2s;
+        background: var(--card-bg); color: var(--text-main);
+    }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1); }
+    textarea { resize: vertical; min-height: 120px; }
+    .helper-text { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+    /* Image Upload */
+    .image-upload { border: 2px dashed var(--border); border-radius: 12px; padding: 2rem; text-align: center; cursor: pointer; transition: all 0.2s; background: var(--bg); }
+    .image-upload:hover { border-color: var(--primary); background: var(--primary-light); }
+    .image-upload.has-image { padding: 0; border-style: solid; position: relative; overflow: hidden; }
+    .image-upload img { width: 100%; max-height: 300px; object-fit: cover; display: block; }
+    .upload-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+    .upload-text { font-weight: 600; margin-bottom: 0.25rem; }
+    .upload-hint { font-size: 0.85rem; color: var(--text-muted); }
+    .remove-image { position: absolute; top: 10px; right: 10px; background: var(--card-bg); border: 1px solid var(--border); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1.2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+    /* Ticket Items */
+    .ticket-list { display: flex; flex-direction: column; gap: 1rem; }
+    .ticket-item { border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; position: relative; background: var(--bg); }
+    .ticket-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .ticket-item-title { font-weight: 600; font-size: 1.1rem; }
+    .remove-ticket { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 1.2rem; padding: 0.25rem; }
+    .ticket-fields { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 1rem; }
+    .add-ticket-btn { width: 100%; padding: 1rem; border: 2px dashed var(--border); border-radius: 12px; background: var(--card-bg); cursor: pointer; font-weight: 600; color: var(--primary); transition: all 0.2s; }
+    .add-ticket-btn:hover { border-color: var(--primary); background: var(--primary-light); }
+
+    /* Agenda Items */
+    .agenda-list { display: flex; flex-direction: column; gap: 1rem; }
+    .agenda-item { border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; background: var(--bg); position: relative; }
+    .agenda-fields { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 1rem; align-items: end; }
+    .add-agenda-btn { width: 100%; padding: 1rem; border: 2px dashed var(--border); border-radius: 12px; background: var(--card-bg); cursor: pointer; font-weight: 600; color: var(--primary); transition: all 0.2s; }
+    .add-agenda-btn:hover { border-color: var(--primary); background: var(--primary-light); }
+
+    /* Review Section */
+    .review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    .review-item { padding: 1rem; background: var(--bg); border-radius: 8px; }
+    .review-label { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.25rem; font-weight: 500; }
+    .review-value { font-weight: 600; }
+    .review-full { grid-column: 1 / -1; }
+
+    /* Navigation Buttons */
+    .form-navigation { display: flex; justify-content: space-between; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+    .btn-primary { padding: 0.75rem 2rem; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; font-size: 1rem; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-outline { padding: 0.75rem 2rem; background: var(--card-bg); color: var(--text-main); border: 1px solid var(--border); border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; font-size: 1rem; }
+    .btn-outline:hover { background: var(--bg); }
+
+    /* Success Modal */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
+    .modal-overlay.active { display: flex; }
+    .modal { background: var(--card-bg); color: var(--text-main); border-radius: 16px; padding: 3rem; text-align: center; max-width: 400px; animation: scaleIn 0.3s; }
+    @keyframes scaleIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .success-icon { width: 80px; height: 80px; background: var(--success); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; font-size: 2.5rem; color: white; }
+    .modal h2 { margin-bottom: 0.5rem; }
+    .modal p { color: var(--text-muted); margin-bottom: 2rem; }
+    .modal-btn { padding: 0.75rem 2rem; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<header>
+    <div class="header-left">
+        <button class="back-btn" onclick="location.href='/pages/5_organizer-dashboard.html'" aria-label="Back to dashboard">←</button>
+        <div class="logo">Planning Center</div>
+    </div>
+    <div class="header-right">
+        <button class="btn-demo" onclick="loadDemoData()">✨ Load Demo Data</button>
+        <button class="btn-secondary" onclick="saveDraft()">Save Draft</button>
+        <div class="avatar">S</div>
+    </div>
+</header>
+
+<div class="container">
+    <!-- Progress Steps -->
+    <div class="progress-bar">
+        <div class="progress-line" id="progressLine" style="width: 0%;"></div>
+        <div class="step active" data-step="1">
+            <div class="step-circle">1</div>
+            <div class="step-label">Basic Info</div>
+        </div>
+        <div class="step" data-step="2">
+            <div class="step-circle">2</div>
+            <div class="step-label">Date & Location</div>
+        </div>
+        <div class="step" data-step="3">
+            <div class="step-circle">3</div>
+            <div class="step-label">Tickets</div>
+        </div>
+        <div class="step" data-step="4">
+            <div class="step-circle">4</div>
+            <div class="step-label">Agenda</div>
+        </div>
+        <div class="step" data-step="5">
+            <div class="step-circle">5</div>
+            <div class="step-label">Review</div>
+        </div>
+    </div>
+
+    <form id="createEventForm">
+        <!-- Step 1: Basic Info -->
+        <div class="form-section active" data-section="1">
+            <div class="form-card">
+                <h1 class="section-title">Basic Information</h1>
+                <p class="section-subtitle">Tell attendees what your event is about</p>
+
+                <div class="form-group">
+                    <label>Event Title</label>
+                    <input type="text" id="eventTitle" placeholder="e.g., Tech Innovation Summit 2026">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="eventCategory">
+                            <option value="">Select category</option>
+                            <option value="Technology">Technology</option>
+                            <option value="Business">Business</option>
+                            <option value="Education">Education</option>
+                            <option value="Health">Health & Wellness</option>
+                            <option value="Arts">Arts & Culture</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Event Format</label>
+                        <select id="eventFormat">
+                            <option value="In-Person">In-Person</option>
+                            <option value="Virtual">Virtual/Online</option>
+                            <option value="Hybrid">Hybrid</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="eventDescription" placeholder="Describe your event, what attendees will learn, and why they should attend..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Event Image</label>
+                    <div class="image-upload" id="imageUpload">
+                        <div class="upload-content">
+                            <div class="upload-icon">📸</div>
+                            <div class="upload-text">Click to upload or drag and drop</div>
+                            <div class="upload-hint">PNG, JPG up to 10MB (16:9 ratio recommended)</div>
+                        </div>
+                        <input type="file" id="imageInput" accept="image/*" style="display: none;">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Date & Location -->
+        <div class="form-section" data-section="2">
+            <div class="form-card">
+                <h1 class="section-title">Date & Location</h1>
+                <p class="section-subtitle">When and where will your event take place?</p>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Start Date</label>
+                        <input type="date" id="startDate">
+                    </div>
+                    <div class="form-group">
+                        <label>End Date</label>
+                        <input type="date" id="endDate">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Start Time</label>
+                        <input type="time" id="startTime">
+                    </div>
+                    <div class="form-group">
+                        <label>End Time</label>
+                        <input type="time" id="endTime">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Venue Name</label>
+                    <input type="text" id="venueName" placeholder="e.g., Sokha Hotel Convention Center">
+                </div>
+
+                <div class="form-group">
+                    <label>Full Address</label>
+                    <input type="text" id="venueAddress" placeholder="123 Tech Avenue, Prey Veng Province, Cambodia">
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Tickets -->
+        <div class="form-section" data-section="3">
+            <div class="form-card">
+                <h1 class="section-title">Tickets & Pricing</h1>
+                <p class="section-subtitle">Set up your ticket types and pricing</p>
+
+                <div class="ticket-list" id="ticketList">
+                    <div class="ticket-item">
+                        <div class="ticket-item-header">
+                            <div class="ticket-item-title">Ticket Type 1</div>
+                            <button type="button" class="remove-ticket" onclick="removeTicket(this)">🗑️</button>
+                        </div>
+                        <div class="ticket-fields">
+                            <div>
+                                <label>Ticket Name</label>
+                                <input type="text" placeholder="e.g., General Admission" class="ticket-name">
+                            </div>
+                            <div>
+                                <label>Price ($)</label>
+                                <input type="number" placeholder="250" class="ticket-price" min="0">
+                            </div>
+                            <div>
+                                <label>Quantity</label>
+                                <input type="number" placeholder="1000" class="ticket-quantity" min="1">
+                            </div>
+                            <div>
+                                <label>Description</label>
+                                <input type="text" placeholder="Access to all sessions" class="ticket-desc">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" class="add-ticket-btn" onclick="addTicket()">+ Add Another Ticket Type</button>
+            </div>
+        </div>
+
+        <!-- Step 4: Agenda -->
+        <div class="form-section" data-section="4">
+            <div class="form-card">
+                <h1 class="section-title">Event Agenda</h1>
+                <p class="section-subtitle">Add sessions, speakers, and schedule</p>
+
+                <div class="agenda-list" id="agendaList">
+                    <div class="agenda-item">
+                        <div class="agenda-fields">
+                            <div>
+                                <label>Time</label>
+                                <input type="text" placeholder="09:00 AM - 10:00 AM" class="agenda-time">
+                            </div>
+                            <div>
+                                <label>Session Title</label>
+                                <input type="text" placeholder="Opening Keynote" class="agenda-title">
+                            </div>
+                            <div>
+                                <label>Speaker</label>
+                                <input type="text" placeholder="John Doe" class="agenda-speaker">
+                            </div>
+                        </div>
+                        <button type="button" class="remove-ticket" onclick="removeAgenda(this)" style="position: absolute; top: 10px; right: 10px;">🗑️</button>
+                    </div>
+                </div>
+
+                <button type="button" class="add-agenda-btn" onclick="addAgenda()">+ Add Session</button>
+            </div>
+        </div>
+
+        <!-- Step 5: Review -->
+        <div class="form-section" data-section="5">
+            <div class="form-card">
+                <h1 class="section-title">Review & Publish</h1>
+                <p class="section-subtitle">Double-check your event details before publishing</p>
+                <div class="review-grid" id="reviewContent"></div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="form-navigation">
+            <button type="button" class="btn-outline" id="prevBtn" onclick="changeStep(-1)" style="visibility: hidden;">← Previous</button>
+            <button type="button" class="btn-primary" id="nextBtn" onclick="changeStep(1)">Next Step →</button>
+        </div>
+    </form>
+</div>
+
+<!-- Success Modal -->
+<div class="modal-overlay" id="successModal">
+    <div class="modal">
+        <div class="success-icon">✓</div>
+        <h2 id="successTitle">Event Created!</h2>
+        <p id="successText">Your event has been published successfully.</p>
+        <button class="modal-btn" onclick="closeModal()">View Dashboard</button>
+    </div>
+</div>
+
+<script>
+    let currentStep = 1;
+    const totalSteps = 5;
+    let currentImageData = null;
+    let editingEvent = null; // set when the dashboard sent us here to edit an event
+
+    function changeStep(direction) {
+        if (direction === 1 && currentStep === totalSteps) {
+            publishEvent();
+            return;
+        }
+
+        const newStep = currentStep + direction;
+        if (newStep < 1 || newStep > totalSteps) return;
+
+        currentStep = newStep;
+        updateUI();
+
+        if (currentStep === totalSteps) {
+            populateReview();
+        }
+    }
+
+    function updateUI() {
+        document.querySelectorAll('.form-section').forEach(section => section.classList.remove('active'));
+        document.querySelector(`[data-section="${currentStep}"]`).classList.add('active');
+
+        document.querySelectorAll('.step').forEach((step, index) => {
+            const stepNum = index + 1;
+            step.classList.remove('active', 'completed');
+            if (stepNum === currentStep) {
+                step.classList.add('active');
+                step.querySelector('.step-circle').textContent = stepNum;
+            } else if (stepNum < currentStep) {
+                step.classList.add('completed');
+                step.querySelector('.step-circle').textContent = '✓';
+            } else {
+                step.querySelector('.step-circle').textContent = stepNum;
+            }
+        });
+
+        const progress = ((currentStep - 1) / (totalSteps - 1)) * 100;
+        document.getElementById('progressLine').style.width = progress + '%';
+
+        document.getElementById('prevBtn').style.visibility = currentStep === 1 ? 'hidden' : 'visible';
+        document.getElementById('nextBtn').textContent = currentStep === totalSteps ? (editingEvent ? 'Save Changes' : 'Publish Event') : 'Next Step →';
+    }
+
+    function populateReview() {
+        const title = document.getElementById('eventTitle').value || 'Not set';
+        const category = document.getElementById('eventCategory').value || 'Not set';
+        const format = document.getElementById('eventFormat').value || 'Not set';
+        const startDate = document.getElementById('startDate').value || 'Not set';
+        const startTime = document.getElementById('startTime').value || 'Not set';
+        const venue = document.getElementById('venueName').value || 'Not set';
+        const address = document.getElementById('venueAddress').value || 'Not set';
+        const description = document.getElementById('eventDescription').value || 'Not set';
+
+        let ticketSummary = '';
+        document.querySelectorAll('.ticket-item').forEach((ticket, index) => {
+            const name = ticket.querySelector('.ticket-name').value || `Ticket ${index + 1}`;
+            const price = ticket.querySelector('.ticket-price').value || '0';
+            const qty = ticket.querySelector('.ticket-quantity').value || '0';
+            ticketSummary += `<strong>${name}:</strong> $${price} (${qty} qty)<br>`;
+        });
+
+        let agendaSummary = '';
+        document.querySelectorAll('.agenda-item').forEach((item) => {
+            const time = item.querySelector('.agenda-time').value || 'TBA';
+            const title = item.querySelector('.agenda-title').value || 'Untitled Session';
+            agendaSummary += `<strong>${time}:</strong> ${title}<br>`;
+        });
+
+        document.getElementById('reviewContent').innerHTML = `
+            <div class="review-item"><div class="review-label">Event Title</div><div class="review-value">${title}</div></div>
+            <div class="review-item"><div class="review-label">Category & Format</div><div class="review-value">${category} • ${format}</div></div>
+            <div class="review-item"><div class="review-label">Date & Time</div><div class="review-value">${startDate} at ${startTime}</div></div>
+            <div class="review-item"><div class="review-label">Venue</div><div class="review-value">${venue}</div></div>
+            <div class="review-item review-full"><div class="review-label">Address</div><div class="review-value">${address}</div></div>
+            <div class="review-item review-full"><div class="review-label">Description</div><div class="review-value" style="font-weight: 400; font-size: 0.9rem;">${description}</div></div>
+            <div class="review-item review-full"><div class="review-label">Tickets</div><div class="review-value" style="font-weight: 400; font-size: 0.9rem;">${ticketSummary || 'No tickets configured'}</div></div>
+            <div class="review-item review-full"><div class="review-label">Agenda</div><div class="review-value" style="font-weight: 400; font-size: 0.9rem;">${agendaSummary || 'No sessions added'}</div></div>
+        `;
+    }
+
+    // ── Build + persist the event so it shows on the Organizer Dashboard ──
+    function fmtTime(s, e) {
+        const f = (t) => {
+            if (!t) return "";
+            let [h, m] = t.split(":").map(Number);
+            const ap = h >= 12 ? "PM" : "AM";
+            h = h % 12 || 12;
+            return h + ":" + String(m).padStart(2, "0") + " " + ap;
+        };
+        const a = f(s), b = f(e);
+        return a && b ? a + " - " + b : (a || "TBA");
+    }
+
+    function buildEvent(status) {
+        const startDate = document.getElementById('startDate').value;
+        let dateStr = "TBA";
+        if (startDate) {
+            const d = new Date(startDate);
+            if (!isNaN(d.getTime())) {
+                dateStr = d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+            }
+        }
+        let capacity = 0;
+        document.querySelectorAll('.ticket-quantity').forEach((q) => { capacity += Number(q.value) || 0; });
+        if (!capacity) capacity = 100;
+        const firstTicket = document.querySelector('.ticket-item');
+        const price = firstTicket ? Number(firstTicket.querySelector('.ticket-price').value) || 0 : 0;
+
+        return {
+            id: editingEvent ? editingEvent.id : Date.now(),
+            title: (document.getElementById('eventTitle').value || "Untitled Event").trim(),
+            category: document.getElementById('eventCategory').value || "General",
+            date: dateStr,
+            time: fmtTime(document.getElementById('startTime').value, document.getElementById('endTime').value),
+            location: (document.getElementById('venueName').value || document.getElementById('venueAddress').value || "TBA").trim(),
+            image: currentImageData || "/assets/images/Technology.png",
+            price: price,
+            capacity: capacity,
+            registered: editingEvent ? (Number(editingEvent.registered) || 0) : 0,
+            status: status,
+            description: (document.getElementById('eventDescription').value || "No description yet.").trim()
+        };
+    }
+
+    function saveCreatedEvent(ev) {
+        function push(obj) {
+            const list = JSON.parse(localStorage.getItem("erms_created_events") || "[]");
+            const i = list.findIndex((e) => String(e.id) === String(obj.id));
+            if (i !== -1) list[i] = obj; else list.push(obj); // upsert: edit replaces, create appends
+            localStorage.setItem("erms_created_events", JSON.stringify(list));
+        }
+        try {
+            push(ev);
+        } catch (err) {
+            // Likely a localStorage quota issue from a large uploaded image — retry without it.
+            ev.image = "/assets/images/Technology.png";
+            try { push(ev); } catch (e2) {}
+        }
+    }
+
+    function publishEvent() {
+        const title = document.getElementById('eventTitle').value.trim();
+        if (!title) {
+            alert("Please enter an event title before publishing.");
+            currentStep = 1; updateUI();
+            return;
+        }
+        if (editingEvent) {
+            saveCreatedEvent(buildEvent(editingEvent.status || "published"));
+            document.getElementById('successTitle').textContent = "Event Updated!";
+            document.getElementById('successText').textContent = "Your changes have been saved successfully.";
+        } else {
+            saveCreatedEvent(buildEvent("published"));
+        }
+        document.getElementById('successModal').classList.add('active');
+    }
+
+    function saveDraft() {
+        const title = document.getElementById('eventTitle').value.trim();
+        if (!title) { alert("Add an event title first, then save your draft."); return; }
+        saveCreatedEvent(buildEvent("draft"));
+        alert("Draft saved to your dashboard.");
+        window.location.href = "/pages/5_organizer-dashboard.html";
+    }
+
+    function closeModal() { window.location.href = "/pages/5_organizer-dashboard.html"; }
+
+    // ── Edit mode: if the dashboard stashed an event, prefill the wizard ──
+    function hydrateFromEdit() {
+        let raw;
+        try { raw = JSON.parse(localStorage.getItem("erms_edit_event") || "null"); } catch (e) { raw = null; }
+        if (!raw) return;
+        localStorage.removeItem("erms_edit_event"); // one-shot — a later "Create" starts fresh
+        editingEvent = raw;
+
+        const set = (id, val) => { const el = document.getElementById(id); if (el && val != null) el.value = val; };
+        set("eventTitle", raw.title);
+        set("eventCategory", raw.category);
+        set("eventDescription", raw.description);
+        set("venueName", raw.location);
+
+        // "October 30, 2026" → yyyy-mm-dd for <input type=date>
+        if (raw.date && raw.date !== "TBA") {
+            const d = new Date(raw.date);
+            if (!isNaN(d.getTime())) {
+                set("startDate", d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"));
+            }
+        }
+        // "9:00 AM - 5:00 PM" → 24h for the two <input type=time>
+        const to24 = (s) => {
+            const m = (s || "").trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+            if (!m) return "";
+            let h = Number(m[1]) % 12; if (/PM/i.test(m[3])) h += 12;
+            return String(h).padStart(2, "0") + ":" + m[2];
+        };
+        if (raw.time && raw.time.includes("-")) {
+            const [a, b] = raw.time.split("-");
+            set("startTime", to24(a));
+            set("endTime", to24(b));
+        }
+
+        // The first ticket row carries the event's price + capacity
+        const t = document.querySelector(".ticket-item");
+        if (t) {
+            const nm = t.querySelector(".ticket-name");  if (nm && !nm.value) nm.value = "General Admission";
+            const pr = t.querySelector(".ticket-price"); if (pr) pr.value = raw.price != null ? raw.price : "";
+            const qt = t.querySelector(".ticket-quantity"); if (qt) qt.value = raw.capacity != null ? raw.capacity : "";
+        }
+
+        // Cover image
+        if (raw.image) {
+            currentImageData = raw.image;
+            const up = document.getElementById("imageUpload");
+            if (up) {
+                up.innerHTML = '<img src="' + raw.image + '" alt="Event image"><button type="button" class="remove-image" onclick="removeImage(event)">×</button>';
+                up.classList.add("has-image");
+            }
+        }
+
+        // Re-skin as an editor
+        document.title = "Edit Event - Planning Center";
+        updateUI();
+    }
+    hydrateFromEdit();
+
+    // Image Upload
+    const imageUpload = document.getElementById('imageUpload');
+    const imageInput = document.getElementById('imageInput');
+    imageUpload.addEventListener('click', () => imageInput.click());
+    imageInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                currentImageData = e.target.result;
+                imageUpload.innerHTML = `<img src="${e.target.result}" alt="Event image"><button type="button" class="remove-image" onclick="removeImage(event)">×</button>`;
+                imageUpload.classList.add('has-image');
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+    function removeImage(e) {
+        e.stopPropagation();
+        currentImageData = null;
+        imageUpload.innerHTML = `<div class="upload-content"><div class="upload-icon">📸</div><div class="upload-text">Click to upload or drag and drop</div><div class="upload-hint">PNG, JPG up to 10MB</div></div>`;
+        imageUpload.classList.remove('has-image');
+        imageInput.value = '';
+    }
+
+    // Ticket & Agenda Management
+    function addTicket() {
+        const ticketList = document.getElementById('ticketList');
+        const count = ticketList.children.length + 1;
+        const div = document.createElement('div');
+        div.className = 'ticket-item';
+        div.innerHTML = `<div class="ticket-item-header"><div class="ticket-item-title">Ticket Type ${count}</div><button type="button" class="remove-ticket" onclick="removeTicket(this)">🗑️</button></div><div class="ticket-fields"><div><label>Ticket Name</label><input type="text" placeholder="VIP Pass" class="ticket-name"></div><div><label>Price ($)</label><input type="number" placeholder="450" class="ticket-price"></div><div><label>Quantity</label><input type="number" placeholder="500" class="ticket-quantity"></div><div><label>Description</label><input type="text" placeholder="Exclusive access" class="ticket-desc"></div></div>`;
+        ticketList.appendChild(div);
+    }
+    function removeTicket(btn) {
+        if (document.getElementById('ticketList').children.length > 1) btn.closest('.ticket-item').remove();
+    }
+    function addAgenda() {
+        const list = document.getElementById('agendaList');
+        const div = document.createElement('div');
+        div.className = 'agenda-item';
+        div.innerHTML = `<div class="agenda-fields"><div><label>Time</label><input type="text" placeholder="10:00 AM" class="agenda-time"></div><div><label>Session Title</label><input type="text" placeholder="AI Workshop" class="agenda-title"></div><div><label>Speaker</label><input type="text" placeholder="Jane Doe" class="agenda-speaker"></div></div><button type="button" class="remove-ticket" onclick="removeAgenda(this)" style="position: absolute; top: 10px; right: 10px;">🗑️</button>`;
+        list.appendChild(div);
+    }
+    function removeAgenda(btn) { btn.closest('.agenda-item').remove(); }
+
+    // Demo Data Loader
+    function loadDemoData() {
+        document.getElementById('eventTitle').value = "Tech Innovation Summit 2026";
+        document.getElementById('eventCategory').value = "Technology";
+        document.getElementById('eventFormat').value = "In-Person";
+        document.getElementById('eventDescription').value = "Join us for the premier technology conference of 2026. Connect with industry leaders, discover cutting-edge innovations, and network with fellow tech enthusiasts from around the world.";
+        document.getElementById('startDate').value = "2026-11-15";
+        document.getElementById('startTime').value = "09:00";
+        document.getElementById('endTime').value = "17:00";
+        document.getElementById('venueName').value = "Sokha Hotel Convention Center";
+        document.getElementById('venueAddress').value = "123 Tech Avenue, Prey Veng Province, Cambodia";
+
+        document.querySelector('.ticket-name').value = "General Admission";
+        document.querySelector('.ticket-price').value = "250";
+        document.querySelector('.ticket-quantity').value = "1500";
+        document.querySelector('.ticket-desc').value = "Access to all keynotes and workshops";
+
+        document.querySelector('.agenda-time').value = "09:00 AM - 10:30 AM";
+        document.querySelector('.agenda-title').value = "Opening Keynote: The Future of AI";
+        document.querySelector('.agenda-speaker').value = "Sarah Jenkins, CEO TechCorp";
+
+        alert("Demo data loaded! Click 'Next Step' to explore the rest of the form.");
+    }
+</script>
+<script src="/assets/js/7_cursor.js"></script>
+</body>
+</html>

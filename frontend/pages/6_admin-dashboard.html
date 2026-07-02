@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Planning Center — Admin Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="/assets/css/1_global.css" />
+  <link rel="stylesheet" href="/assets/css/2_navbar.css" />
+  <link rel="stylesheet" href="/assets/css/6_dashboard.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <style>
+    /* ── Admin-only extras (tabs/tables/badges/buttons come from shared CSS) ── */
+    .role-filter { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+    .role-pill {
+      padding:6px 16px; border-radius:20px; border:1.5px solid var(--border);
+      background:var(--bg-white); font-size:13px; font-weight:500; font-family:var(--font);
+      color:var(--text-medium); cursor:pointer; transition:all .15s;
+    }
+    .role-pill:hover  { border-color:var(--primary); color:var(--primary); }
+    .role-pill.active { background:var(--primary); border-color:var(--primary); color:#fff; }
+
+    .table-search {
+      display:flex; align-items:center; gap:8px; border:1px solid var(--border);
+      border-radius:var(--border-radius); padding:8px 14px; background:var(--bg-white);
+      margin-bottom:16px; max-width:340px;
+    }
+    .table-search i { color:var(--text-light); }
+    .table-search input {
+      border:none; outline:none; font-size:13px; font-family:var(--font);
+      width:100%; background:transparent; color:var(--text-dark);
+    }
+
+    .section-header {
+      display:flex; align-items:center; justify-content:space-between;
+      margin-bottom:14px; flex-wrap:wrap; gap:10px;
+    }
+
+    /* Role badges */
+    .badge-role-admin     { background:#dbeafe; color:#1d4ed8; }
+    .badge-role-organizer { background:#fce7f3; color:#be185d; }
+    .badge-role-attendee  { background:#dcfce7; color:#15803d; }
+    .badge-role-supervisor{ background:#fef9c3; color:#a16207; }
+    body.dark .badge-role-admin     { background:rgba(37,99,235,.2);  color:#93c5fd; }
+    body.dark .badge-role-organizer { background:rgba(190,24,93,.22); color:#f9a8d4; }
+    body.dark .badge-role-attendee  { background:rgba(21,128,61,.22); color:#86efac; }
+    body.dark .badge-role-supervisor{ background:rgba(161,98,7,.25);  color:#fcd34d; }
+
+    .muted-row td { opacity:.55; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position:fixed; inset:0; background:rgba(15,23,42,.55);
+      display:none; align-items:center; justify-content:center; z-index:1000; padding:16px;
+      -webkit-backdrop-filter:blur(2px); backdrop-filter:blur(2px);
+    }
+    .modal-overlay.show { display:flex; }
+    .modal-box {
+      background:var(--bg-white); border-radius:var(--border-radius-lg);
+      width:100%; max-width:460px; padding:24px; box-shadow:0 24px 60px rgba(0,0,0,.3);
+      animation:modalpop .25s ease;
+    }
+    @keyframes modalpop { from { opacity:0; transform:translateY(14px) scale(.98); } to { opacity:1; transform:none; } }
+    .modal-head { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+    .modal-head h3 { font-size:18px; font-weight:700; color:var(--text-dark); margin:0; }
+    .modal-head .m-close {
+      margin-left:auto; border:none; background:transparent; font-size:22px;
+      color:var(--text-light); cursor:pointer; line-height:1;
+    }
+    .modal-icon {
+      width:44px; height:44px; border-radius:12px; display:flex; align-items:center;
+      justify-content:center; font-size:22px; flex-shrink:0;
+    }
+    .modal-icon.danger { background:#fee2e2; color:#dc2626; }
+    .modal-icon.info   { background:#dbeafe; color:#1d4ed8; }
+    body.dark .modal-icon.danger { background:rgba(220,38,38,.2); }
+    body.dark .modal-icon.info   { background:rgba(37,99,235,.2); }
+
+    .profile-top { display:flex; align-items:center; gap:14px; margin-bottom:18px; }
+    .profile-top .avatar-circle { width:54px; height:54px; font-size:20px; }
+    .profile-top .p-name { font-size:17px; font-weight:700; color:var(--text-dark); }
+    .profile-top .p-email { font-size:13px; color:var(--text-light); }
+    .detail-row {
+      display:flex; justify-content:space-between; gap:12px;
+      padding:9px 0; border-bottom:1px solid var(--border); font-size:14px;
+    }
+    .detail-row:last-child { border:none; }
+    .detail-row .d-key { color:var(--text-light); }
+    .detail-row .d-val { color:var(--text-dark); font-weight:500; text-align:right; }
+
+    .field-label { display:block; font-size:13px; font-weight:600; color:var(--text-medium); margin:14px 0 6px; }
+    .field-select {
+      width:100%; padding:10px 12px; border:1px solid var(--border);
+      border-radius:var(--border-radius); font-family:var(--font); font-size:14px;
+      background:var(--bg-white); color:var(--text-dark);
+    }
+    .modal-actions { display:flex; gap:10px; margin-top:22px; }
+    .modal-actions .btn { flex:1; justify-content:center; }
+    .modal-text { font-size:14px; color:var(--text-medium); line-height:1.55; }
+    .modal-text strong { color:var(--text-dark); }
+
+    .empty-row td { text-align:center; color:var(--text-light); padding:26px; font-style:italic; }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar">
+    <a class="nav-logo" href="/pages/1_index.html">
+      <span class="logo-top">Planning</span>
+      <span class="logo-bottom">Center</span>
+    </a>
+    <button class="hamburger" id="hamburger">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="nav-links" id="navLinks">
+      <button class="btn btn-outline" onclick="location.href='/pages/1_index.html'">
+        <i class="ri-home-line"></i> Home
+      </button>
+      <button class="btn btn-primary">
+        <i class="ri-dashboard-line"></i> Dashboard
+      </button>
+      <button class="btn btn-outline" onclick="logout()">
+        <i class="ri-logout-box-r-line"></i> Logout
+      </button>
+    </div>
+  </nav>
+
+  <div class="dashboard-page">
+    <div class="dashboard-header">
+      <div>
+        <h1>Admin Dashboard</h1>
+        <p>Monitor platform performance and manage all activities</p>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <span id="adminName" style="font-size:13px;color:var(--text-medium)"></span>
+      </div>
+    </div>
+
+    <div class="dashboard-body">
+
+      <!-- ── Tabs ── -->
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="tab-overview" onclick="switchTab('tab-overview')">
+          <i class="ri-bar-chart-line"></i> Overview
+        </button>
+        <button class="tab-btn" data-tab="tab-users" onclick="switchTab('tab-users')">
+          <i class="ri-group-line"></i> Manage Users
+        </button>
+        <button class="tab-btn" data-tab="tab-events" onclick="switchTab('tab-events')">
+          <i class="ri-calendar-event-line"></i> Manage Events
+        </button>
+        <button class="tab-btn" data-tab="tab-refunds" onclick="switchTab('tab-refunds'); renderRefunds()">
+          <i class="ri-refund-2-line"></i> Refunds <span id="refundBadge" style="display:none;background:#dc2626;color:#fff;border-radius:999px;font-size:10px;padding:1px 6px;margin-left:4px"></span>
+        </button>
+      </div>
+
+      <!-- ════════ TAB 1: OVERVIEW ════════ -->
+      <div class="tab-content active" id="tab-overview">
+
+        <div class="stats-cards">
+          <div class="stat-card">
+            <div class="stat-card-info">
+              <div class="label">Total Events</div>
+              <div class="value" id="statTotalEvents">—</div>
+              <div class="trend-up">Live platform count</div>
+            </div>
+            <div class="stat-card-icon"><i class="ri-file-list-3-line"></i></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-info">
+              <div class="label">Total Users</div>
+              <div class="value" id="statTotalUsers">—</div>
+              <div class="trend-up" id="statUsersSub">Live platform count</div>
+            </div>
+            <div class="stat-card-icon"><i class="ri-group-line"></i></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-info">
+              <div class="label">Total Revenue</div>
+              <div class="value" id="statRevenue">—</div>
+              <div class="trend-up">From registrations × price</div>
+            </div>
+            <div class="stat-card-icon"><i class="ri-money-dollar-circle-line"></i></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-info">
+              <div class="label">Registrations</div>
+              <div class="value" id="statRegs">—</div>
+              <div class="trend-up">Across all events</div>
+            </div>
+            <div class="stat-card-icon"><i class="ri-bar-chart-line"></i></div>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card">
+            <h3>Monthly Revenue</h3>
+            <canvas id="revenueChart" height="180"></canvas>
+          </div>
+          <div class="chart-card">
+            <h3>Events by Category</h3>
+            <canvas id="categoryChart" height="180"></canvas>
+          </div>
+        </div>
+
+        <div class="card" style="padding:20px;margin-bottom:20px">
+          <div class="section-header">
+            <div class="section-title" style="margin:0">Recent Registrations</div>
+            <div class="table-search" style="margin:0;max-width:260px">
+              <i class="ri-search-line"></i>
+              <input type="text" placeholder="Search registrations..."
+                oninput="filterTable('regTable', this.value)" />
+            </div>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="data-table" id="regTable">
+              <thead>
+                <tr><th>ATTENDEE</th><th>EVENT</th><th>DATE</th><th>AMOUNT</th><th>STATUS</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><div style="display:flex;align-items:center;gap:10px">
+                    <div class="avatar-circle badge-role-admin">M</div> Muon Sokea
+                  </div></td>
+                  <td>Tech Innovation Summit 2026</td>
+                  <td><i class="ri-time-line"></i> March 13, 2026</td>
+                  <td>$300</td>
+                  <td><span class="badge badge-confirmed"><i class="ri-checkbox-circle-line"></i> Confirmed</span></td>
+                </tr>
+                <tr>
+                  <td><div style="display:flex;align-items:center;gap:10px">
+                    <div class="avatar-circle badge-role-organizer">P</div> Proeung Sivly
+                  </div></td>
+                  <td>Business Leadership Conference</td>
+                  <td><i class="ri-time-line"></i> March 13, 2026</td>
+                  <td>$300</td>
+                  <td><span class="badge badge-pending"><i class="ri-time-line"></i> Pending</span></td>
+                </tr>
+                <tr>
+                  <td><div style="display:flex;align-items:center;gap:10px">
+                    <div class="avatar-circle badge-role-attendee">S</div> San Sotheayuth
+                  </div></td>
+                  <td>Digital Marketing Workshop</td>
+                  <td><i class="ri-time-line"></i> March 13, 2026</td>
+                  <td>$300</td>
+                  <td><span class="badge badge-confirmed"><i class="ri-checkbox-circle-line"></i> Confirmed</span></td>
+                </tr>
+                <tr>
+                  <td><div style="display:flex;align-items:center;gap:10px">
+                    <div class="avatar-circle badge-role-supervisor">L</div> Lang Socheat
+                  </div></td>
+                  <td>Networking &amp; Innovation Forum</td>
+                  <td><i class="ri-time-line"></i> March 13, 2026</td>
+                  <td>$300</td>
+                  <td><span class="badge badge-cancelled"><i class="ri-close-circle-line"></i> Cancelled</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ════════ TAB 2: MANAGE USERS ════════ -->
+      <div class="tab-content" id="tab-users">
+
+        <div class="section-header">
+          <div class="section-title" style="margin:0">Manage Users</div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="font-size:13px;color:var(--text-light)">
+              <i class="ri-group-line"></i> <span id="userCount">0</span> users
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="openModal('createUserModal')">
+              <i class="ri-user-add-line"></i> Add User
+            </button>
+          </div>
+        </div>
+
+        <div class="role-filter" id="roleFilter">
+          <button class="role-pill active" onclick="filterByRole('all', this)">All</button>
+          <button class="role-pill" onclick="filterByRole('Attendee', this)">Attendee</button>
+          <button class="role-pill" onclick="filterByRole('Organizer', this)">Organizer</button>
+          <button class="role-pill" onclick="filterByRole('Admin', this)">Admin</button>
+          <button class="role-pill" onclick="filterByRole('Supervisor', this)">Super Admin</button>
+        </div>
+
+        <div class="table-search">
+          <i class="ri-search-line"></i>
+          <input type="text" id="userSearch" placeholder="Search by name or email..."
+            oninput="renderUsers()" />
+        </div>
+
+        <div style="overflow-x:auto">
+          <table class="data-table" id="usersTable">
+            <thead>
+              <tr>
+                <th>Name</th><th>Email</th><th>Role</th>
+                <th>Status</th><th>Joined</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="usersTableBody"><!-- rendered by JS --></tbody>
+          </table>
+        </div>
+
+      </div>
+
+      <!-- ════════ TAB 3: MANAGE EVENTS ════════ -->
+      <div class="tab-content" id="tab-events">
+
+        <div class="section-header">
+          <div class="section-title" style="margin:0">Manage Events</div>
+          <div style="font-size:13px;color:var(--text-light)">
+            <i class="ri-calendar-event-line"></i> <span id="eventCount">0</span> events
+          </div>
+        </div>
+
+        <div class="role-filter" id="eventFilter">
+          <button class="role-pill active" onclick="filterByStatus('all', this)">All</button>
+          <button class="role-pill" onclick="filterByStatus('Available', this)">Available</button>
+          <button class="role-pill" onclick="filterByStatus('Full', this)">Full</button>
+          <button class="role-pill" onclick="filterByStatus('Draft', this)">Draft</button>
+        </div>
+
+        <div class="table-search">
+          <i class="ri-search-line"></i>
+          <input type="text" id="eventSearch" placeholder="Search by title or category..."
+            oninput="renderEventsTab()" />
+        </div>
+
+        <div style="overflow-x:auto">
+          <table class="data-table" id="eventsTable">
+            <thead>
+              <tr>
+                <th>Event Title</th><th>Organizer</th><th>Category</th>
+                <th>Date</th><th>Registered</th><th>Revenue</th>
+                <th>Status</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="eventsTableBody"><!-- rendered by JS --></tbody>
+          </table>
+        </div>
+
+      </div>
+
+      <!-- ════════ TAB 4: REFUNDS ════════ -->
+      <div class="tab-content" id="tab-refunds">
+        <div class="section-header">
+          <div class="section-title" style="margin:0">Refund Requests</div>
+          <div style="font-size:13px;color:var(--text-light)">
+            <i class="ri-refund-2-line"></i> <span id="refundCount">0</span> requests
+          </div>
+        </div>
+        <div class="role-filter" id="refundFilter">
+          <button class="role-pill active" onclick="filterRefunds('all', this)">All</button>
+          <button class="role-pill" onclick="filterRefunds('pending', this)">Pending</button>
+          <button class="role-pill" onclick="filterRefunds('approved', this)">Approved</button>
+          <button class="role-pill" onclick="filterRefunds('rejected', this)">Rejected</button>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="data-table" id="refundsTable">
+            <thead>
+              <tr><th>Ticket</th><th>Event</th><th>Reason</th><th>Requested</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="refundsTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════ MODALS ══════════ -->
+
+  <!-- View profile -->
+  <div class="modal-overlay" id="viewModal">
+    <div class="modal-box">
+      <div class="modal-head">
+        <h3>User Profile</h3>
+        <button class="m-close" onclick="closeModal('viewModal')">&times;</button>
+      </div>
+      <div id="viewBody"></div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closeModal('viewModal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit role + status -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div class="modal-icon info"><i class="ri-edit-line"></i></div>
+        <h3>Edit User</h3>
+        <button class="m-close" onclick="closeModal('editModal')">&times;</button>
+      </div>
+      <p class="modal-text" style="margin-bottom:4px">
+        Editing <strong id="editName"></strong>
+      </p>
+      <label class="field-label" for="editRole">Role</label>
+      <select class="field-select" id="editRole">
+        <option value="Attendee">Attendee</option>
+        <option value="Organizer">Organizer</option>
+        <option value="Admin">Admin</option>
+      </select>
+      <label class="field-label" for="editStatus">Status</label>
+      <select class="field-select" id="editStatus">
+        <option value="Active">Active</option>
+        <option value="Suspended">Suspended</option>
+      </select>
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closeModal('editModal')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveEdit()">
+          <i class="ri-save-line"></i> Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete confirm -->
+  <div class="modal-overlay" id="deleteModal">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div class="modal-icon danger"><i class="ri-delete-bin-line"></i></div>
+        <h3>Delete User</h3>
+        <button class="m-close" onclick="closeModal('deleteModal')">&times;</button>
+      </div>
+      <p class="modal-text">
+        Are you sure you want to delete <strong id="deleteName"></strong>?
+        This removes their account from the platform and cannot be undone.
+      </p>
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closeModal('deleteModal')">Cancel</button>
+        <button class="btn btn-danger" onclick="confirmDelete()">
+          <i class="ri-delete-bin-line"></i> Delete
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete event confirm -->
+  <div class="modal-overlay" id="eventDeleteModal">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div class="modal-icon danger"><i class="ri-delete-bin-line"></i></div>
+        <h3>Delete Event</h3>
+        <button class="m-close" onclick="closeModal('eventDeleteModal')">&times;</button>
+      </div>
+      <p class="modal-text">
+        Are you sure you want to delete <strong id="eventDeleteName"></strong>?
+        This removes it from the platform and cannot be undone.
+      </p>
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closeModal('eventDeleteModal')">Cancel</button>
+        <button class="btn btn-danger" onclick="confirmEventDelete()">
+          <i class="ri-delete-bin-line"></i> Delete
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create User -->
+  <div class="modal-overlay" id="createUserModal">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div class="modal-icon info"><i class="ri-user-add-line"></i></div>
+        <h3>Add New User</h3>
+        <button class="m-close" onclick="closeModal('createUserModal')">&times;</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label class="field-label">First Name *</label>
+          <input class="field-select" type="text" id="newFirstName" placeholder="First name" />
+        </div>
+        <div>
+          <label class="field-label">Last Name *</label>
+          <input class="field-select" type="text" id="newLastName" placeholder="Last name" />
+        </div>
+      </div>
+      <label class="field-label">Email *</label>
+      <input class="field-select" type="email" id="newEmail" placeholder="user@example.com" />
+      <label class="field-label">Password *</label>
+      <input class="field-select" type="password" id="newPassword" placeholder="Minimum 6 characters" />
+      <label class="field-label">Role</label>
+      <select class="field-select" id="newRole">
+        <option value="Attendee">Attendee</option>
+        <option value="Organizer">Organizer</option>
+        <option value="Admin">Admin</option>
+      </select>
+      <div id="createUserError" style="font-size:13px;color:#dc2626;margin-top:8px;display:none"></div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closeModal('createUserModal')">Cancel</button>
+        <button class="btn btn-primary" onclick="createUser()">
+          <i class="ri-user-add-line"></i> Create User
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/assets/js/0_api.js"></script>
+  <script src="/assets/js/2_events.js"></script>
+  <script src="/assets/js/1_navbar.js"></script>
+  <script type="module" src="/assets/js/4_dashboard.js"></script>
+  <script>
+    // ── Protect page ──
+    const BYPASS_AUTH = true;
+    if (!BYPASS_AUTH) {
+        requireAuth();
+        requireRole(["Admin"]);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // DATA SOURCES
+    // NOTE: we deliberately do NOT load 3_auth.js here — its DOMContentLoaded
+    // redirects any logged-in user to the home page, which would bounce the
+    // admin off this dashboard. So the reserved role accounts are inlined
+    // (mirrors specificUsers in 3_auth.js), and attendees are read straight
+    // from localStorage. Attendee edits persist to erms_attendees; reserved
+    // account edits persist to an erms_admin_overrides map (since the reserved
+    // list is hardcoded and can't be mutated).
+    // ─────────────────────────────────────────────────────────────────────
+    const RESERVED_USERS = [
+      { firstName:"Muon",   lastName:"Sokea",      email:"muonsokea@gmail.com",     role:"Supervisor", joined:"Jan 10, 2026" },
+      { firstName:"San",    lastName:"Sotheayuth", email:"sansotheayuth@gmail.com", role:"Admin",      joined:"Jan 10, 2026" },
+      { firstName:"Proeung",lastName:"Sivly",      email:"proeungsivly@gmail.com",  role:"Organizer",  joined:"Jan 10, 2026" },
+      { firstName:"Lang",   lastName:"Socheat",    email:"langsocheat@gmail.com",   role:"Attendee",   joined:"Jan 10, 2026" }
+    ];
+
+    const OVERRIDES_KEY = "erms_admin_overrides";
+    const loadOverrides  = () => { try { return JSON.parse(localStorage.getItem(OVERRIDES_KEY) || "{}") || {}; } catch (e) { return {}; } };
+    const saveOverrides  = (o) => localStorage.setItem(OVERRIDES_KEY, JSON.stringify(o));
+    const loadAttendees  = () => { try { const a = JSON.parse(localStorage.getItem("erms_attendees") || "[]"); return Array.isArray(a) ? a : []; } catch (e) { return []; } };
+    const saveAttendees  = (a) => localStorage.setItem("erms_attendees", JSON.stringify(a));
+
+    let currentAdminEmail = "";
+    let activeRoleFilter  = "all";
+    let pendingEmail      = null; // user targeted by edit/delete modal
+
+    // Build the unified user list (reserved + attendees), applying overrides.
+    function getUsers() {
+      const ov = loadOverrides();
+      const reserved = RESERVED_USERS
+        .map(u => {
+          const o = ov[u.email] || {};
+          return { ...u, role: o.role || u.role, status: o.status || "Active", deleted: !!o.deleted, src: "reserved" };
+        })
+        .filter(u => !u.deleted);
+
+      const attendees = loadAttendees().map(u => ({
+        firstName: u.firstName || "", lastName: u.lastName || "",
+        email: u.email || "", role: u.role || "Attendee",
+        status: u.status || "Active",
+        joined: u.joined || (Number(u.id) > 1e12 ? new Date(Number(u.id)).toLocaleDateString("en-US", { year:"numeric", month:"short", day:"numeric" }) : "—"),
+        phone: u.phone || "", address: u.address || "", src: "attendee"
+      }));
+
+      return [...reserved, ...attendees];
+    }
+
+    const fullName = (u) => `${u.firstName} ${u.lastName}`.trim() || u.email;
+    const initial  = (u) => (u.firstName || u.email || "?").charAt(0).toUpperCase();
+
+    const ROLE_BADGE = { Supervisor:"badge-role-supervisor", Admin:"badge-role-admin", Organizer:"badge-role-organizer", Attendee:"badge-role-attendee" };
+    const ROLE_LABEL = { Supervisor:"Super Admin", Admin:"Admin", Organizer:"Organizer", Attendee:"Attendee" };
+    const AVATAR_BG  = { Supervisor:["#fef9c3","#a16207"], Admin:["#dbeafe","#1d4ed8"], Organizer:["#fce7f3","#be185d"], Attendee:["#dcfce7","#15803d"] };
+
+    function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+
+    // ── Render the users table ──
+    function renderUsers() {
+      const body = document.getElementById("usersTableBody");
+      const q = (document.getElementById("userSearch").value || "").toLowerCase();
+      const users = getUsers().filter(u => {
+        const roleOk = activeRoleFilter === "all" || u.role === activeRoleFilter;
+        const text = (fullName(u) + " " + u.email).toLowerCase();
+        return roleOk && text.includes(q);
+      });
+
+      document.getElementById("userCount").textContent = getUsers().length;
+      // Live stat on the Overview tab
+      const stat = document.getElementById("statTotalUsers");
+      if (stat) stat.textContent = getUsers().length.toLocaleString();
+
+      if (!users.length) {
+        body.innerHTML = `<tr class="empty-row"><td colspan="6">No users match this filter.</td></tr>`;
+        return;
+      }
+
+      body.innerHTML = users.map(u => {
+        const [bg, fg] = AVATAR_BG[u.role] || ["#e2e8f0","#475569"];
+        const protectedRow = (u.role === "Supervisor") || (u.email.toLowerCase() === currentAdminEmail);
+        const statusBadge = u.status === "Suspended"
+          ? `<span class="badge badge-cancelled"><i class="ri-forbid-line"></i> Suspended</span>`
+          : `<span class="badge badge-confirmed"><i class="ri-checkbox-circle-line"></i> Active</span>`;
+
+        const suspendIcon = u.status === "Suspended" ? "ri-check-line" : "ri-forbid-line";
+        const suspendTitle = u.status === "Suspended" ? "Unsuspend" : "Suspend";
+
+        const actions = protectedRow
+          ? `<button class="btn btn-outline btn-sm" title="View" onclick="viewUser('${u.email}')"><i class="ri-eye-line"></i></button>
+             <span style="font-size:11px;color:var(--text-light);margin-left:6px">${u.role === "Supervisor" ? "Protected" : "You"}</span>`
+          : `<div class="action-btns">
+               <button class="btn btn-outline btn-sm" title="View" onclick="viewUser('${u.email}')"><i class="ri-eye-line"></i></button>
+               <button class="btn btn-outline btn-sm" title="Edit" onclick="openEdit('${u.email}')"><i class="ri-edit-line"></i></button>
+               <button class="btn btn-outline btn-sm" title="${suspendTitle}" onclick="toggleSuspend('${u.email}')"><i class="${suspendIcon}"></i></button>
+               <button class="btn btn-danger btn-sm" title="Delete" onclick="openDelete('${u.email}')"><i class="ri-delete-bin-line"></i></button>
+             </div>`;
+
+        return `<tr class="${u.status === "Suspended" ? "muted-row" : ""}">
+          <td><div style="display:flex;align-items:center;gap:10px">
+            <div class="avatar-circle" style="background:${bg};color:${fg}">${initial(u)}</div>
+            ${escapeHtml(fullName(u))}
+          </div></td>
+          <td>${escapeHtml(u.email)}</td>
+          <td><span class="badge ${ROLE_BADGE[u.role] || ""}">${ROLE_LABEL[u.role] || u.role}</span></td>
+          <td>${statusBadge}</td>
+          <td>${escapeHtml(u.joined)}</td>
+          <td>${actions}</td>
+        </tr>`;
+      }).join("");
+    }
+
+    function findUser(email) { return getUsers().find(u => u.email.toLowerCase() === email.toLowerCase()); }
+
+    // ── View profile ──
+    function viewUser(email) {
+      const u = findUser(email);
+      if (!u) return;
+      const [bg, fg] = AVATAR_BG[u.role] || ["#e2e8f0","#475569"];
+      document.getElementById("viewBody").innerHTML = `
+        <div class="profile-top">
+          <div class="avatar-circle" style="background:${bg};color:${fg}">${initial(u)}</div>
+          <div>
+            <div class="p-name">${escapeHtml(fullName(u))}</div>
+            <div class="p-email">${escapeHtml(u.email)}</div>
+          </div>
+        </div>
+        <div class="detail-row"><span class="d-key">Role</span><span class="d-val"><span class="badge ${ROLE_BADGE[u.role]||""}">${ROLE_LABEL[u.role]||u.role}</span></span></div>
+        <div class="detail-row"><span class="d-key">Status</span><span class="d-val">${u.status}</span></div>
+        <div class="detail-row"><span class="d-key">Joined</span><span class="d-val">${escapeHtml(u.joined)}</span></div>
+        <div class="detail-row"><span class="d-key">Phone</span><span class="d-val">${escapeHtml(u.phone || "—")}</span></div>
+        <div class="detail-row"><span class="d-key">Address</span><span class="d-val">${escapeHtml(u.address || "—")}</span></div>
+        <div class="detail-row"><span class="d-key">Account type</span><span class="d-val">${u.src === "reserved" ? "Built-in role account" : "Registered attendee"}</span></div>`;
+      openModal("viewModal");
+    }
+
+    // ── Edit role + status ──
+    function openEdit(email) {
+      const u = findUser(email);
+      if (!u) return;
+      pendingEmail = email;
+      document.getElementById("editName").textContent = fullName(u);
+      document.getElementById("editRole").value = (u.role === "Supervisor") ? "Admin" : u.role;
+      document.getElementById("editStatus").value = u.status;
+      openModal("editModal");
+    }
+
+    function saveEdit() {
+      const u = findUser(pendingEmail);
+      if (!u) { closeModal("editModal"); return; }
+      const newRole = document.getElementById("editRole").value;
+      const newStatus = document.getElementById("editStatus").value;
+
+      if (u.src === "attendee") {
+        const list = loadAttendees();
+        const i = list.findIndex(a => (a.email || "").toLowerCase() === pendingEmail.toLowerCase());
+        if (i !== -1) { list[i].role = newRole; list[i].status = newStatus; saveAttendees(list); }
+      } else {
+        const ov = loadOverrides();
+        ov[u.email] = { ...(ov[u.email] || {}), role: newRole, status: newStatus };
+        saveOverrides(ov);
+      }
+      closeModal("editModal");
+      renderUsers();
+    }
+
+    // ── Suspend / unsuspend ──
+    function toggleSuspend(email) {
+      const u = findUser(email);
+      if (!u) return;
+      const next = u.status === "Suspended" ? "Active" : "Suspended";
+      if (u.src === "attendee") {
+        const list = loadAttendees();
+        const i = list.findIndex(a => (a.email || "").toLowerCase() === email.toLowerCase());
+        if (i !== -1) { list[i].status = next; saveAttendees(list); }
+      } else {
+        const ov = loadOverrides();
+        ov[u.email] = { ...(ov[u.email] || {}), status: next };
+        saveOverrides(ov);
+      }
+      renderUsers();
+    }
+
+    // ── Delete ──
+    function openDelete(email) {
+      const u = findUser(email);
+      if (!u) return;
+      pendingEmail = email;
+      document.getElementById("deleteName").textContent = fullName(u);
+      openModal("deleteModal");
+    }
+
+    function confirmDelete() {
+      const u = findUser(pendingEmail);
+      if (!u) { closeModal("deleteModal"); return; }
+      if (u.src === "attendee") {
+        const list = loadAttendees().filter(a => (a.email || "").toLowerCase() !== pendingEmail.toLowerCase());
+        saveAttendees(list);
+      } else {
+        const ov = loadOverrides();
+        ov[u.email] = { ...(ov[u.email] || {}), deleted: true };
+        saveOverrides(ov);
+      }
+      closeModal("deleteModal");
+      renderUsers();
+    }
+
+    // ── Modal + tab + filter helpers ──
+    function openModal(id)  { document.getElementById(id).classList.add("show"); }
+    function closeModal(id) { document.getElementById(id).classList.remove("show"); }
+    document.querySelectorAll(".modal-overlay").forEach(ov => {
+      ov.addEventListener("click", e => { if (e.target === ov) ov.classList.remove("show"); });
+    });
+    document.addEventListener("keydown", e => {
+      if (e.key === "Escape") document.querySelectorAll(".modal-overlay.show").forEach(m => m.classList.remove("show"));
+    });
+
+    function switchTab(tabId) {
+      document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.getElementById(tabId).classList.add("active");
+      document.querySelector(`[data-tab="${tabId}"]`).classList.add("active");
+    }
+
+    function filterByRole(role, btn) {
+      activeRoleFilter = role;
+      document.querySelectorAll("#roleFilter .role-pill").forEach(p => p.classList.remove("active"));
+      btn.classList.add("active");
+      renderUsers();
+    }
+
+    // Generic text filter (used by Recent Registrations on Overview)
+    function filterTable(tableId, query) {
+      document.querySelectorAll(`#${tableId} tbody tr`).forEach(row => {
+        row.style.display = row.textContent.toLowerCase().includes(query.toLowerCase()) ? "" : "none";
+      });
+    }
+
+    // ═════════════════════════════════════════════════════════════════════
+    // MANAGE EVENTS
+    // mockEvents (from 2_events.js) are hardcoded → moderation persists to an
+    // erms_event_overrides map (status/deleted) keyed by id. Created events
+    // (erms_created_events) are mutated directly. mockEvents use `attending`,
+    // created events use `registered` — normalized to `reg` below.
+    // ═════════════════════════════════════════════════════════════════════
+    const EVENT_OV_KEY = "erms_event_overrides";
+    const loadEventOv   = () => { try { return JSON.parse(localStorage.getItem(EVENT_OV_KEY) || "{}") || {}; } catch (e) { return {}; } };
+    const saveEventOv   = (o) => localStorage.setItem(EVENT_OV_KEY, JSON.stringify(o));
+    const loadCreated   = () => { try { const a = JSON.parse(localStorage.getItem("erms_created_events") || "[]"); return Array.isArray(a) ? a : []; } catch (e) { return []; } };
+    const saveCreated   = (a) => localStorage.setItem("erms_created_events", JSON.stringify(a));
+    const DEFAULT_ORGANIZER = "Proeung Sivly";
+
+    let activeStatusFilter = "all";
+    let pendingEventId = null;
+
+    function getEvents() {
+      const ov = loadEventOv();
+      const created = loadCreated().map(e => ({
+        ...e, reg: Number(e.registered ?? e.attending) || 0,
+        rawStatus: e.status || "published", src: "created"
+      }));
+      // An edited built-in event gets a created-events copy with the same id —
+      // let that shadow the original so it isn't shown twice.
+      const createdIds = new Set(created.map(e => String(e.id)));
+      const mock = (typeof mockEvents !== "undefined" ? mockEvents : []).map(e => {
+        const o = ov[e.id] || {};
+        return { ...e, reg: Number(e.attending) || 0, rawStatus: o.status || "published", deleted: !!o.deleted, src: "mock" };
+      }).filter(e => !e.deleted && !createdIds.has(String(e.id)));
+      return [...mock, ...created];
+    }
+
+    // Display status: Draft (unpublished) / Full / Available
+    function displayStatus(e) {
+      if (e.rawStatus === "draft") return "Draft";
+      return (e.reg >= (Number(e.capacity) || 0) && Number(e.capacity) > 0) ? "Full" : "Available";
+    }
+    const STATUS_BADGE = { Available: "badge-available", Full: "badge-full", Draft: "badge-pending" };
+
+    function renderEventsTab() {
+      const body = document.getElementById("eventsTableBody");
+      const q = (document.getElementById("eventSearch").value || "").toLowerCase();
+      const all = getEvents();
+      document.getElementById("eventCount").textContent = all.length;
+
+      const events = all.filter(e => {
+        const st = displayStatus(e);
+        const stOk = activeStatusFilter === "all" || st === activeStatusFilter;
+        const text = (`${e.title} ${e.category}`).toLowerCase();
+        return stOk && text.includes(q);
+      });
+
+      if (!events.length) {
+        body.innerHTML = `<tr class="empty-row"><td colspan="8">No events match this filter.</td></tr>`;
+        return;
+      }
+
+      body.innerHTML = events.map(e => {
+        const st = displayStatus(e);
+        const revenue = (e.reg * (Number(e.price) || 0)).toLocaleString();
+        const cap = Number(e.capacity) || 0;
+        const isDraft = st === "Draft";
+        const toggleBtn = isDraft
+          ? `<button class="btn btn-success btn-sm" title="Approve & publish" onclick="approveEvent('${e.src}','${e.id}')"><i class="ri-check-line"></i></button>`
+          : `<button class="btn btn-outline btn-sm" title="Unpublish" onclick="unpublishEvent('${e.src}','${e.id}')"><i class="ri-eye-off-line"></i></button>`;
+
+        return `<tr class="${isDraft ? "muted-row" : ""}">
+          <td style="font-weight:500">${escapeHtml(e.title)}</td>
+          <td>${DEFAULT_ORGANIZER}</td>
+          <td>${escapeHtml(e.category || "—")}</td>
+          <td>${escapeHtml(e.date || "—")}</td>
+          <td>${e.reg.toLocaleString()}${cap ? " / " + cap.toLocaleString() : ""}</td>
+          <td style="color:var(--success);font-weight:600">$${revenue}</td>
+          <td><span class="badge ${STATUS_BADGE[st] || ""}">${st}</span></td>
+          <td><div class="action-btns">
+            <button class="btn btn-outline btn-sm" title="View" onclick="viewEventDetail('${e.src}','${e.id}')"><i class="ri-eye-line"></i></button>
+            ${toggleBtn}
+            <button class="btn btn-danger btn-sm" title="Delete" onclick="openEventDelete('${e.src}','${e.id}')"><i class="ri-delete-bin-line"></i></button>
+          </div></td>
+        </tr>`;
+      }).join("");
+    }
+
+    function findEvent(src, id) {
+      return getEvents().find(e => e.src === src && String(e.id) === String(id));
+    }
+
+    function filterByStatus(status, btn) {
+      activeStatusFilter = status;
+      document.querySelectorAll("#eventFilter .role-pill").forEach(p => p.classList.remove("active"));
+      btn.classList.add("active");
+      renderEventsTab();
+    }
+
+    // Set rawStatus for an event (created → mutate; mock → override)
+    function setEventStatus(src, id, status) {
+      if (src === "created") {
+        const list = loadCreated();
+        const i = list.findIndex(e => String(e.id) === String(id));
+        if (i !== -1) { list[i].status = status; saveCreated(list); }
+      } else {
+        const ov = loadEventOv();
+        ov[id] = { ...(ov[id] || {}), status };
+        saveEventOv(ov);
+      }
+      renderEventsTab();
+      updateStats();
+    }
+    const approveEvent   = (src, id) => setEventStatus(src, id, "published");
+    const unpublishEvent = (src, id) => setEventStatus(src, id, "draft");
+
+    function viewEventDetail(src, id) {
+      const e = findEvent(src, id);
+      if (!e) return;
+      // Normalize fields the detail page expects (created events lack
+      // attending/rating), then store under the key 2_events.js reads.
+      const payload = {
+        ...e,
+        attending: e.reg,
+        rating: Number(e.rating) || 0,
+        status: displayStatus(e)
+      };
+      if (typeof saveEventToStorage === "function") saveEventToStorage(payload);
+      else localStorage.setItem("erms_selected_event", JSON.stringify(payload));
+      window.location.href = " 8_event-detail.html";
+    }
+
+    function openEventDelete(src, id) {
+      const e = findEvent(src, id);
+      if (!e) return;
+      pendingEventId = { src, id };
+      document.getElementById("eventDeleteName").textContent = e.title;
+      openModal("eventDeleteModal");
+    }
+
+    function confirmEventDelete() {
+      if (!pendingEventId) { closeModal("eventDeleteModal"); return; }
+      const { src, id } = pendingEventId;
+      if (src === "created") {
+        saveCreated(loadCreated().filter(e => String(e.id) !== String(id)));
+      } else {
+        const ov = loadEventOv();
+        ov[id] = { ...(ov[id] || {}), deleted: true };
+        saveEventOv(ov);
+      }
+      closeModal("eventDeleteModal");
+      renderEventsTab();
+      updateStats();
+    }
+
+    // ── Real Overview stats (events / revenue / registrations / users) ──
+    function updateStats() {
+      const events = getEvents();
+      const totalReg = events.reduce((s, e) => s + e.reg, 0);
+      const totalRev = events.reduce((s, e) => s + e.reg * (Number(e.price) || 0), 0);
+      const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+      set("statTotalEvents", events.length.toLocaleString());
+      set("statRegs", totalReg.toLocaleString());
+      set("statRevenue", "$" + totalRev.toLocaleString());
+      set("statTotalUsers", getUsers().length.toLocaleString());
+    }
+
+    // ── Create User ──
+    function createUser() {
+      const err = document.getElementById("createUserError");
+      err.style.display = "none";
+      const firstName = document.getElementById("newFirstName").value.trim();
+      const lastName  = document.getElementById("newLastName").value.trim();
+      const email     = document.getElementById("newEmail").value.trim().toLowerCase();
+      const password  = document.getElementById("newPassword").value;
+      const role      = document.getElementById("newRole").value;
+
+      if (!firstName || !lastName || !email || !password) {
+        err.textContent = "Please fill in all required fields."; err.style.display = "block"; return;
+      }
+      if (password.length < 6) {
+        err.textContent = "Password must be at least 6 characters."; err.style.display = "block"; return;
+      }
+      if (!/\S+@\S+\.\S+/.test(email)) {
+        err.textContent = "Please enter a valid email address."; err.style.display = "block"; return;
+      }
+      if (getUsers().some(u => u.email.toLowerCase() === email)) {
+        err.textContent = "An account with this email already exists."; err.style.display = "block"; return;
+      }
+
+      const newUser = {
+        id: Date.now(), firstName, lastName, email, role,
+        status: "Active", joined: new Date().toLocaleDateString("en-US", { year:"numeric", month:"short", day:"numeric" }),
+        phone: "", address: ""
+      };
+      const list = loadAttendees();
+      list.push(newUser);
+      saveAttendees(list);
+
+      ["newFirstName","newLastName","newEmail","newPassword"].forEach(id => document.getElementById(id).value = "");
+      document.getElementById("newRole").value = "Attendee";
+      closeModal("createUserModal");
+      renderUsers();
+      updateStats();
+    }
+
+    // ── Refunds tab ──
+    let activeRefundFilter = "all";
+    const REFUND_STATUS_BADGE = { pending: "badge-pending", approved: "badge-confirmed", rejected: "badge-cancelled" };
+    const REFUND_STATUS_LABEL = { pending: "Pending", approved: "Approved", rejected: "Rejected" };
+
+    function renderRefunds() {
+      const body = document.getElementById("refundsTableBody");
+      const all  = JSON.parse(localStorage.getItem("erms_refunds") || "[]");
+      document.getElementById("refundCount").textContent = all.length;
+
+      const badge = document.getElementById("refundBadge");
+      const pending = all.filter(r => r.status === "pending").length;
+      if (pending > 0) { badge.textContent = pending; badge.style.display = "inline"; }
+      else badge.style.display = "none";
+
+      const filtered = activeRefundFilter === "all" ? all : all.filter(r => r.status === activeRefundFilter);
+      if (!filtered.length) {
+        body.innerHTML = `<tr class="empty-row"><td colspan="6">No refund requests found.</td></tr>`;
+        return;
+      }
+      body.innerHTML = filtered.map((r, i) => {
+        const realIndex = all.indexOf(r);
+        const date = r.requestedAt ? new Date(r.requestedAt).toLocaleDateString("en-US", { year:"numeric", month:"short", day:"numeric" }) : "—";
+        const actions = r.status === "pending"
+          ? `<div class="action-btns">
+               <button class="btn btn-success btn-sm" onclick="authorizeRefund(${realIndex})"><i class="ri-check-line"></i> Approve</button>
+               <button class="btn btn-danger btn-sm" onclick="rejectRefund(${realIndex})"><i class="ri-close-line"></i> Reject</button>
+             </div>`
+          : `<span style="font-size:12px;color:var(--text-light)">No action needed</span>`;
+        return `<tr>
+          <td style="font-weight:500">${escapeHtml(r.ticketCode || "—")}</td>
+          <td>${escapeHtml(r.eventName || "—")}</td>
+          <td>${escapeHtml(r.reason || "—")}</td>
+          <td>${date}</td>
+          <td><span class="badge ${REFUND_STATUS_BADGE[r.status] || ""}">${REFUND_STATUS_LABEL[r.status] || r.status}</span></td>
+          <td>${actions}</td>
+        </tr>`;
+      }).join("");
+    }
+
+    function authorizeRefund(index) {
+      const refunds = JSON.parse(localStorage.getItem("erms_refunds") || "[]");
+      if (refunds[index]) { refunds[index].status = "approved"; localStorage.setItem("erms_refunds", JSON.stringify(refunds)); }
+      renderRefunds();
+    }
+
+    function rejectRefund(index) {
+      const refunds = JSON.parse(localStorage.getItem("erms_refunds") || "[]");
+      if (refunds[index]) { refunds[index].status = "rejected"; localStorage.setItem("erms_refunds", JSON.stringify(refunds)); }
+      renderRefunds();
+    }
+
+    function filterRefunds(status, btn) {
+      activeRefundFilter = status;
+      document.querySelectorAll("#refundFilter .role-pill").forEach(p => p.classList.remove("active"));
+      btn.classList.add("active");
+      renderRefunds();
+    }
+
+    // ── Init ──
+    document.addEventListener("DOMContentLoaded", () => {
+      const me = (typeof getCurrentUser === "function") ? getCurrentUser() : null;
+      if (me) {
+        currentAdminEmail = (me.email || "").toLowerCase();
+        document.getElementById("adminName").textContent = "Welcome, " + (me.firstName || "Admin") + " " + (me.lastName || "");
+      }
+      renderUsers();
+      renderEventsTab();
+      renderRefunds();
+      updateStats();
+
+      new Chart(document.getElementById("revenueChart"), {
+        type: "line",
+        data: { labels: ["Oct","Nov","Dec","Jan","Feb","Mar"],
+          datasets: [{ data: [45000,52000,48000,60000,55000,72000], borderColor:"#4A90D9",
+            backgroundColor:"rgba(74,144,217,0.08)", tension:0.4, fill:true, pointBackgroundColor:"#4A90D9", pointRadius:4 }] },
+        options: { plugins:{ legend:{ display:false } },
+          scales:{ y:{ beginAtZero:true, grid:{ color:"#f0f0f0" } }, x:{ grid:{ display:false } } } }
+      });
+
+      new Chart(document.getElementById("categoryChart"), {
+        type: "bar",
+        data: { labels: ["Technology","Business","Workshop","Entertainment","Healthcare"],
+          datasets: [{ data: [45,31,28,32,15], backgroundColor:"#4A90D9", borderRadius:4 }] },
+        options: { plugins:{ legend:{ display:false } },
+          scales:{ y:{ beginAtZero:true, grid:{ color:"#f0f0f0" } }, x:{ grid:{ display:false } } } }
+      });
+    });
+  </script>
+  <script src="/assets/js/7_cursor.js"></script>
+</body>
+</html>

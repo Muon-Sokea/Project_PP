@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Planning Center — Your Ticket</title>
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="/assets/css/1_global.css" />
+  <link rel="stylesheet" href="/assets/css/2_navbar.css" />
+  <link rel="stylesheet" href="/assets/css/7_ticket.css" />
+</head>
+<body>
+
+  <nav class="navbar">
+    <a class="nav-logo" href="/pages/1_index.html">
+      <span class="logo-top">Planning</span>
+      <span class="logo-bottom">Center</span>
+    </a>
+    <button class="hamburger" id="hamburger">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="nav-links" id="navLinks">
+      <button class="btn btn-outline"
+        onclick="location.href='/'">
+        <i class="ri-home-line"></i> Home
+      </button>
+      <button class="btn btn-outline" onclick="goToDashboard()">
+        <i class="ri-dashboard-line"></i> Dashboard
+      </button>
+      <button class="btn btn-outline" onclick="logout()">
+        <i class="ri-logout-box-r-line"></i> Logout
+      </button>
+    </div>
+  </nav>
+
+  <!-- Success Screen -->
+  <div id="successScreen" class="success-screen" style="display:none">
+    <div class="success-icon">
+      <i class="ri-checkbox-circle-fill"
+        style="font-size:80px;color:var(--success)"></i>
+    </div>
+    <h2>Done</h2>
+    <p>Your ticket purchase<br>Successfully completed</p>
+    <div style="font-size:60px;margin:16px 0;color:var(--primary)">
+      <i class="ri-ticket-2-line"></i>
+    </div>
+    <button class="btn btn-primary" style="padding:12px 32px"
+      onclick="document.getElementById('successScreen').style.display='none';
+               document.getElementById('ticketView').style.display='block'">
+      View My Ticket
+    </button>
+  </div>
+
+  <!-- Ticket View -->
+  <div id="ticketView">
+    <div class="ticket-page">
+      <div class="ticket-card" id="ticketCard">
+
+        <div class="ticket-qr">
+          <div id="qrCodeContainer"></div>
+        </div>
+
+        <div class="ticket-id-label">Ticket ID</div>
+        <div class="ticket-id-value" id="ticketIdDisplay">TKT-001-2026</div>
+
+        <hr class="ticket-divider" />
+
+        <div class="ticket-event-title" id="ticketEventTitle">
+          Tech Innovation Summit 2026
+        </div>
+        <div class="ticket-attendee" id="ticketAttendee">
+          Attendee: Muon Sokea
+        </div>
+
+        <div class="ticket-meta">
+          <div class="ticket-meta-item">
+            <i class="ri-calendar-line"
+              style="color:var(--primary)"></i>
+            <span id="ticketDate">April 30, 2026</span>
+          </div>
+          <div class="ticket-meta-item">
+            <i class="ri-time-line"
+              style="color:var(--primary)"></i>
+            <span id="ticketTime">9:00 AM - 5:00 PM</span>
+          </div>
+          <div class="ticket-meta-item">
+            <i class="ri-map-pin-line"
+              style="color:var(--primary)"></i>
+            <span id="ticketLocation">Prey Veng Province</span>
+          </div>
+        </div>
+
+        <div class="ticket-instructions">
+          <strong>Instructions:</strong> Present this QR code at the
+          event entrance for check-in. You can download or screenshot
+          this ticket for offline access.
+        </div>
+
+        <button class="btn btn-primary btn-full" id="downloadBtn">
+          <i class="ri-download-line"></i> Download Ticket
+        </button>
+
+        <button class="btn btn-outline btn-full"
+          style="margin-top:10px" onclick="goToDashboard()">
+          <i class="ri-arrow-left-line"></i> Back to Dashboard
+        </button>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="/assets/js/0_api.js"></script>
+  <script src="/assets/js/1_navbar.js"></script>
+  <script src="/assets/js/5_ticket.js"></script>
+  <script src="/assets/js/7_cursor.js"></script>
+</body>
+</html>

@@ -1,0 +1,1766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Planning Center — My Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="/assets/css/1_global.css" />
+  <link rel="stylesheet" href="/assets/css/2_navbar.css" />
+  <link rel="stylesheet" href="/assets/css/6_dashboard.css" />
+  <style>
+    /* Profile Settings Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open {
+      display: flex;
+    }
+    .modal {
+      background: var(--bg-white);
+      border-radius: var(--border-radius-lg);
+      width: 100%;
+      max-width: 520px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: var(--shadow-md);
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--bg-white);
+      z-index: 1;
+    }
+    .modal-header h3 {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text-dark);
+    }
+    .modal-close {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: none;
+      background: var(--bg-light);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      color: var(--text-medium);
+      transition: background 0.15s;
+    }
+    .modal-close:hover { background: var(--border); }
+    .modal-body { padding: 24px; }
+    .modal-tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-light);
+      border-radius: var(--border-radius);
+      padding: 4px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .modal-tab {
+      flex: 1;
+      padding: 7px 10px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      font-size: 12px;
+      font-weight: 500;
+      font-family: var(--font);
+      color: var(--text-medium);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .modal-tab.active {
+      background: var(--bg-white);
+      color: var(--primary);
+      box-shadow: var(--shadow-sm);
+    }
+    .modal-tab-content { display: none; }
+    .modal-tab-content.active { display: block; }
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .setting-row:last-child { border-bottom: none; }
+    .setting-label { font-size: 14px; font-weight: 500; }
+    .setting-sub { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+    .toggle-switch {
+      position: relative;
+      width: 44px; height: 24px;
+      border-radius: 12px;
+      background: var(--text-light);
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+    .toggle-switch::after {
+      content: "";
+      position: absolute;
+      width: 18px; height: 18px;
+      background: var(--bg-white);
+      border-radius: 50%;
+      top: 3px; left: 3px;
+      transition: transform 0.2s;
+    }
+    .toggle-switch.on { background: var(--primary); }
+    .toggle-switch.on::after { transform: translateX(20px); }
+    .avatar-upload {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 20px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .avatar-big {
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      background: var(--primary-light);
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: 700;
+      flex-shrink: 0;
+      overflow: hidden;
+      box-shadow: inset 0 0 0 1px var(--primary-border);
+    }
+    .avatar-big svg,
+    .avatar-big img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+    }
+    .refund-modal-body { padding: 24px; }
+    .refund-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .refund-step {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .step-num {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .step-info .s-title { font-size: 14px; font-weight: 600; }
+    .step-info .s-desc  { font-size: 13px; color: var(--text-light); }
+    .photo-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1200;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(12, 12, 18, 0.54);
+      backdrop-filter: blur(12px);
+    }
+    .photo-modal-overlay.open {
+      display: flex;
+      animation: fadeIn 0.22s ease both;
+    }
+    .photo-modal {
+      width: min(520px, 100%);
+      background: #1a1a1a;
+      color: #fff;
+      border-radius: 22px;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+      overflow: hidden;
+      animation: slideUp 0.28s ease both;
+    }
+    .photo-modal-header {
+      height: 62px;
+      display: grid;
+      grid-template-columns: 44px 1fr 44px;
+      align-items: center;
+      gap: 8px;
+      padding: 0 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .photo-modal-title {
+      text-align: center;
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .photo-icon-btn {
+      width: 38px;
+      height: 38px;
+      border: 0;
+      border-radius: 50%;
+      background: transparent;
+      color: #f7f7fb;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      transition: background 0.18s ease, transform 0.18s ease;
+    }
+    .photo-icon-btn:hover {
+      background: rgba(255, 255, 255, 0.09);
+      transform: translateY(-1px);
+    }
+    .avatar-gallery-wrap { padding: 22px 20px 14px; }
+    .avatar-gallery {
+      display: flex;
+      gap: 14px;
+      overflow-x: auto;
+      padding: 2px 2px 10px;
+      scroll-snap-type: x mandatory;
+      scrollbar-width: none;
+    }
+    .avatar-gallery::-webkit-scrollbar { display: none; }
+    .avatar-option {
+      width: 78px;
+      height: 78px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      border: 3px solid transparent;
+      background: transparent;
+      padding: 3px;
+      cursor: pointer;
+      scroll-snap-align: start;
+      transition: border-color 0.18s ease, transform 0.18s ease;
+    }
+    .avatar-option:hover { transform: translateY(-2px); }
+    .avatar-option.selected {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(245, 166, 35, 0.16);
+    }
+    .avatar-option svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      border-radius: 50%;
+    }
+    .photo-actions {
+      display: grid;
+      gap: 10px;
+      padding: 4px 20px 22px;
+    }
+    .photo-action-btn {
+      width: 100%;
+      min-height: 48px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: var(--border-radius);
+      background: #292929;
+      color: #fff;
+      font-family: var(--font);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+    }
+    .photo-action-btn:hover {
+      background: #323232;
+      border-color: rgba(245, 166, 35, 0.42);
+      transform: translateY(-1px);
+    }
+    .profile-toast {
+      position: fixed;
+      left: 50%;
+      bottom: 28px;
+      z-index: 1300;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(-50%) translateY(16px);
+      background: var(--gradient-primary);
+      color: #fff;
+      border-radius: 999px;
+      padding: 11px 16px;
+      box-shadow: 0 14px 34px var(--primary-glow);
+      font-size: 13px;
+      font-weight: 600;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+    .profile-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    .photo-input { display: none; }
+    @media (max-width: 640px) {
+      .photo-modal-overlay { align-items: flex-end; padding: 12px; }
+      .photo-modal { border-radius: 20px; }
+      .avatar-option { width: 72px; height: 72px; }
+    }
+
+    .badge.refund-pending  { background: #fef3c7; color: #92400e; }
+    .badge.refund-approved { background: #d1fae5; color: #065f46; }
+    .badge.refund-rejected { background: #fee2e2; color: #991b1b; }
+
+    /* ── Security Tab (all scoped to avoid dashboard conflicts) ── */
+    .sec-list {
+      border-radius: var(--border-radius-lg);
+      border: 1px solid var(--border);
+      overflow: hidden; margin-bottom: 12px;
+    }
+    .sec-list-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 16px; cursor: pointer;
+      transition: background 0.15s; text-decoration: none; color: inherit;
+      background: var(--bg-white);
+    }
+    .sec-list-row:hover { background: var(--bg-light); }
+    .sec-list-row + .sec-list-row { border-top: 1px solid var(--border); }
+    .sec-row-icon {
+      width: 36px; height: 36px; border-radius: 9px;
+      background: var(--primary-light); color: var(--primary);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .sec-row-icon.green { background: var(--primary-light); color: var(--success); }
+    .sec-row-icon svg { width: 18px; height: 18px; }
+    .sec-row-info { flex: 1; }
+    .sec-row-label { font-size: 13px; font-weight: 600; color: var(--text-dark); }
+    .sec-row-desc  { font-size: 12px; color: var(--text-medium); margin-top: 2px; }
+    .sec-row-status { font-size: 12px; font-weight: 600; color: var(--success); }
+    .sec-row-status.off { color: var(--text-light); }
+    .sec-row-arrow { color: var(--text-light); width: 16px; height: 16px; flex-shrink: 0; }
+
+    .sec-activity {
+      background: var(--bg-white); border: 1px solid var(--border);
+      border-radius: var(--border-radius-lg); padding: 14px 16px; margin-bottom: 12px;
+    }
+    .sec-activity h4 { font-size: 13px; font-weight: 700; color: var(--text-dark); margin-bottom: 14px; }
+    .sec-tl { position: relative; padding-left: 22px; }
+    .sec-tl::before {
+      content: ''; position: absolute; left: 6px; top: 6px; bottom: 6px;
+      width: 2px; background: var(--border); border-radius: 1px;
+    }
+    .sec-tl-item {
+      position: relative; display: flex; align-items: flex-start;
+      gap: 10px; padding-bottom: 14px;
+    }
+    .sec-tl-item:last-child { padding-bottom: 0; }
+    .sec-tl-dot {
+      position: absolute; left: -22px; top: 3px;
+      width: 13px; height: 13px; border-radius: 50%;
+      background: var(--primary); border: 2px solid var(--bg-white);
+      box-shadow: 0 0 0 2px var(--primary-light); z-index: 1;
+    }
+    .sec-tl-dot.blue  { background: #3b82f6; box-shadow: 0 0 0 2px var(--bg-white); }
+    .sec-tl-dot.green { background: var(--success); box-shadow: 0 0 0 2px var(--primary-light); }
+    .sec-tl-date  { font-size: 11px; color: var(--text-light); font-weight: 500; min-width: 80px; flex-shrink: 0; }
+    .sec-tl-event { font-size: 12px; color: var(--text-dark); font-weight: 500; }
+    .sec-tl-meta  { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+
+    .sec-devices {
+      background: var(--bg-white); border: 1px solid var(--border);
+      border-radius: var(--border-radius-lg); padding: 14px 16px;
+    }
+    .sec-devices h4 { font-size: 13px; font-weight: 700; color: var(--text-dark); margin-bottom: 10px; }
+    .sec-dev-list { display: flex; flex-direction: column; gap: 3px; }
+    .sec-dev-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 10px; border-radius: var(--border-radius);
+      border: 1px solid transparent; transition: all 0.2s;
+    }
+    .sec-dev-item:hover { background: var(--bg-light); border-color: var(--border); }
+    .sec-dev-item.current { background: var(--primary-light); border-color: var(--primary-border); }
+    .sec-dev-icon {
+      width: 34px; height: 34px; display: flex; align-items: center;
+      justify-content: center; background: var(--bg-light); border-radius: 8px; color: var(--text-medium);
+    }
+    .sec-dev-item.current .sec-dev-icon { background: var(--primary); color: #fff; }
+    .sec-dev-icon svg { width: 17px; height: 17px; }
+    .sec-dev-info { flex: 1; }
+    .sec-dev-name { font-size: 13px; font-weight: 600; color: var(--text-dark); }
+    .sec-dev-meta { font-size: 11px; color: var(--text-medium); margin-top: 1px; }
+    .sec-dev-badge {
+      font-size: 10px; padding: 3px 8px; border-radius: 20px;
+      font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; flex-shrink: 0;
+    }
+    .sec-dev-badge.current { background: var(--primary); color: #fff; }
+    .sec-dev-badge.recent  { background: var(--primary-light); color: var(--success); }
+    .sec-dev-badge.old     { background: var(--bg-light); color: var(--text-light); }
+    .sec-dev-remove {
+      padding: 5px 12px; border: 1.5px solid var(--primary);
+      background: transparent; color: var(--primary);
+      border-radius: 8px; font-size: 12px; font-weight: 600;
+      cursor: pointer; transition: all 0.2s;
+      opacity: 0; transform: translateX(-6px); flex-shrink: 0; font-family: var(--font);
+    }
+    .sec-dev-item:hover .sec-dev-remove { opacity: 1; transform: translateX(0); }
+    .sec-dev-remove:hover { background: var(--primary); color: #fff; }
+
+    /* Security sub-modals */
+    .sec-modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(15,23,42,0.55);
+      backdrop-filter: blur(4px);
+      display: none; align-items: center; justify-content: center;
+      padding: 20px; z-index: 1400;
+    }
+    .sec-modal-overlay.show { display: flex; }
+    .sec-modal {
+      background: var(--bg-white); border-radius: var(--border-radius-lg);
+      padding: 28px 24px; width: 100%; max-width: 360px;
+      text-align: center; box-shadow: var(--shadow-lg);
+      animation: scaleIn 0.25s ease both;
+    }
+    .sec-modal-emoji { font-size: 44px; line-height: 1; margin-bottom: 10px; }
+    .sec-modal-title { font-size: 17px; font-weight: 700; margin-bottom: 6px; color: var(--text-dark); }
+    .sec-modal-text  { font-size: 13px; color: var(--text-medium); margin-bottom: 18px; line-height: 1.6; }
+    .sec-steps { display: flex; gap: 6px; justify-content: center; margin-bottom: 14px; }
+    .sec-step-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); transition: background 0.3s; }
+    .sec-step-dot.active { background: var(--primary); }
+    .sec-modal-input {
+      width: 100%; padding: 11px 14px; border: 1.5px solid var(--border);
+      border-radius: var(--border-radius); font-size: 14px;
+      background: var(--bg-white); color: var(--text-dark); outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      text-align: center; letter-spacing: 0.03em; font-family: var(--font);
+    }
+    .sec-modal-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
+    .sec-modal-hint { font-size: 11px; color: var(--text-light); margin-top: 5px; text-align: left; }
+    .sec-modal-link {
+      display: block; font-size: 12px; color: var(--primary);
+      text-decoration: none; margin-top: 8px; text-align: left;
+    }
+    .sec-modal-link:hover { text-decoration: underline; }
+    .sec-modal-actions { display: flex; gap: 8px; margin-top: 18px; }
+    .sec-btn {
+      flex: 1; padding: 11px 16px; border-radius: var(--border-radius);
+      font-size: 13px; font-weight: 600; cursor: pointer; border: none;
+      transition: all 0.2s; font-family: var(--font);
+    }
+    .sec-btn-primary { background: var(--gradient-primary); color: #fff; }
+    .sec-btn-primary:hover { box-shadow: 0 4px 12px var(--primary-glow); }
+    .sec-btn-secondary { background: var(--bg-light); color: var(--text-dark); border: 1px solid var(--border); }
+    .sec-btn-secondary:hover { background: var(--border); }
+    .sec-btn-danger { background: var(--danger); color: #fff; }
+    .sec-btn-danger:hover { opacity: 0.88; }
+    .sec-pw-field { position: relative; margin-bottom: 10px; text-align: left; }
+    .sec-pw-field input {
+      width: 100%; padding: 11px 42px 11px 14px;
+      border: 1.5px solid var(--border); border-radius: var(--border-radius);
+      font-size: 13px; background: var(--bg-white); color: var(--text-dark);
+      outline: none; transition: border-color 0.2s, box-shadow 0.2s; font-family: var(--font);
+    }
+    .sec-pw-field input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); }
+    .sec-pw-eye {
+      position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+      width: 28px; height: 28px; display: flex; align-items: center;
+      justify-content: center; border-radius: 6px; cursor: pointer;
+      border: none; background: transparent; color: var(--text-light);
+    }
+    .sec-pw-eye:hover { background: var(--bg-light); color: var(--text-dark); }
+    .sec-pw-eye svg { width: 16px; height: 16px; }
+    .sec-pw-eye .slash { display: none; }
+    .sec-pw-eye.showing .open  { display: none; }
+    .sec-pw-eye.showing .slash { display: block; }
+    .sec-toast {
+      position: fixed; bottom: 24px; left: 50%;
+      transform: translateX(-50%) translateY(60px);
+      padding: 9px 20px; background: var(--text-dark); color: #fff;
+      border-radius: 999px; font-size: 13px; font-weight: 500;
+      opacity: 0; transition: all 0.3s ease; pointer-events: none; z-index: 1500;
+    }
+    .sec-toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    @media (max-width: 480px) {
+      .sec-tl-item { flex-direction: column; gap: 2px; }
+      .sec-dev-remove { opacity: 1; transform: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <a class="nav-logo" href="/pages/1_index.html">
+      <span class="logo-top">Planning</span>
+      <span class="logo-bottom">Center</span>
+    </a>
+    <button class="hamburger" id="hamburger">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="nav-links" id="navLinks">
+      <button class="btn btn-outline"
+        onclick="location.href='/pages/1_index.html'">
+        <i class="ri-home-line"></i> Home
+      </button>
+      <button class="btn btn-primary">
+        <i class="ri-dashboard-line"></i> Dashboard
+      </button>
+      <button class="btn btn-outline" onclick="logout()">
+        <i class="ri-logout-box-r-line"></i> Logout
+      </button>
+    </div>
+  </nav>
+
+  <!-- Dashboard -->
+  <div class="dashboard-page">
+    <div class="dashboard-header">
+      <div>
+        <h1>My Dashboard</h1>
+        <p>Manage your event registrations and tickets</p>
+      </div>
+      <button class="btn btn-outline"
+        onclick="openProfileSettings()">
+        <i class="ri-settings-3-line"></i> Profile Settings
+      </button>
+    </div>
+
+    <div class="dashboard-body">
+
+      <!-- Stat Cards -->
+      <div class="stats-cards">
+        <div class="stat-card">
+          <div class="stat-card-info">
+            <div class="label">Total Events</div>
+            <div class="value" id="statTotalEvents">0</div>
+          </div>
+          <div class="stat-card-icon">
+            <i class="ri-file-list-3-line"></i>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-info">
+            <div class="label">Upcoming Events</div>
+            <div class="value" id="statUpcoming">0</div>
+          </div>
+          <div class="stat-card-icon">
+            <i class="ri-checkbox-circle-line"></i>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-info">
+            <div class="label">Total Spent</div>
+            <div class="value" id="statTotalSpent">$0</div>
+          </div>
+          <div class="stat-card-icon">
+            <i class="ri-download-line"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Event Tabs -->
+      <div class="tab-filter">
+        <button class="tab-filter-btn active"
+          onclick="switchEventTab('upcoming', this)">
+          Upcoming Events (2)
+        </button>
+        <button class="tab-filter-btn"
+          onclick="switchEventTab('past', this)">
+          Past Events (0)
+        </button>
+      </div>
+
+      <div id="myEventsGrid"></div>
+
+    </div>
+  </div>
+
+  <!-- ══ Profile Settings Modal ══ -->
+  <div class="modal-overlay" id="profileModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3><i class="ri-settings-3-line"></i> Profile Settings</h3>
+        <button class="modal-close"
+          onclick="closeProfileSettings()">
+          <i class="ri-close-line"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Tabs -->
+        <div class="modal-tabs">
+          <button class="modal-tab active"
+            onclick="switchModalTab('tab-profile', this)">
+            <i class="ri-user-line"></i> Profile
+          </button>
+          <button class="modal-tab"
+            onclick="switchModalTab('tab-security', this)">
+            <i class="ri-shield-line"></i> Security
+          </button>
+          <button class="modal-tab"
+            onclick="switchModalTab('tab-notification', this)">
+            <i class="ri-notification-line"></i> Notifications
+          </button>
+          <button class="modal-tab"
+            onclick="switchModalTab('tab-appearance', this)">
+            <i class="ri-palette-line"></i> Appearance
+          </button>
+        </div>
+
+        <!-- Profile Tab -->
+        <div class="modal-tab-content active" id="tab-profile">
+          <div class="avatar-upload">
+            <div class="avatar-big" id="avatarInitial">?</div>
+            <div>
+              <div style="font-size:14px;font-weight:600;
+                margin-bottom:4px" id="profileFullName">
+                Loading...
+              </div>
+              <div style="font-size:13px;color:var(--text-light);
+                margin-bottom:8px" id="profileEmail">
+              </div>
+              <button class="btn btn-outline btn-sm" type="button"
+                onclick="openProfilePhotoModal()">
+                <i class="ri-camera-line"></i> Change Photo
+              </button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>First Name</label>
+            <input type="text" id="editFirstName"
+              placeholder="First name" />
+          </div>
+          <div class="form-group">
+            <label>Last Name</label>
+            <input type="text" id="editLastName"
+              placeholder="Last name" />
+          </div>
+          <div class="form-group">
+            <label>Email Address</label>
+            <input type="email" id="editEmail"
+              placeholder="Email" />
+          </div>
+          <div class="form-group">
+            <label>Phone Number</label>
+            <input type="tel" id="editPhone"
+              placeholder="Phone number" />
+          </div>
+          <div class="form-group">
+            <label>Address</label>
+            <input type="text" id="editAddress"
+              placeholder="Address" />
+          </div>
+          <button class="btn btn-primary btn-full"
+            onclick="saveProfile()">
+            <i class="ri-save-line"></i> Save Changes
+          </button>
+        </div>
+
+        <!-- Security Tab -->
+        <div class="modal-tab-content" id="tab-security">
+
+          <!-- Quick-action rows -->
+          <div class="sec-list">
+            <a href="#" class="sec-list-row"
+              onclick="openSecModal('setup'); return false;">
+              <div class="sec-row-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+              </div>
+              <div class="sec-row-info">
+                <div class="sec-row-label">Two-Step Verification</div>
+                <div class="sec-row-desc">Add an extra password for login</div>
+              </div>
+              <span class="sec-row-status off" id="tfaStatus">Off</span>
+              <svg class="sec-row-arrow" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+            </a>
+            <a href="#" class="sec-list-row"
+              onclick="openSecModal('password'); return false;">
+              <div class="sec-row-icon green">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2"/>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+              </div>
+              <div class="sec-row-info">
+                <div class="sec-row-label">Change Password</div>
+                <div class="sec-row-desc">Update your account password</div>
+              </div>
+              <svg class="sec-row-arrow" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+            </a>
+          </div>
+
+          <!-- Security Activity Timeline -->
+          <div class="sec-activity">
+            <h4>Security Activity</h4>
+            <div class="sec-tl">
+              <div class="sec-tl-item">
+                <div class="sec-tl-dot blue"></div>
+                <div class="sec-tl-date">May 12, 2024</div>
+                <div>
+                  <div class="sec-tl-event">Login from Chrome on MacBook Pro</div>
+                  <div class="sec-tl-meta">IP: 192.168.1.45 · San Francisco, CA</div>
+                </div>
+              </div>
+              <div class="sec-tl-item">
+                <div class="sec-tl-dot"></div>
+                <div class="sec-tl-date">Apr 30, 2024</div>
+                <div>
+                  <div class="sec-tl-event">Password changed via web</div>
+                  <div class="sec-tl-meta">Initiated from Chrome on MacBook Pro</div>
+                </div>
+              </div>
+              <div class="sec-tl-item">
+                <div class="sec-tl-dot green"></div>
+                <div class="sec-tl-date">Apr 22, 2024</div>
+                <div>
+                  <div class="sec-tl-event">New device linked: iPhone 14</div>
+                  <div class="sec-tl-meta">First login from this device</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Connected Devices -->
+          <div class="sec-devices">
+            <h4>Connected Devices</h4>
+            <div class="sec-dev-list">
+              <div class="sec-dev-item current">
+                <div class="sec-dev-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="3" width="20" height="14" rx="2"/>
+                    <line x1="8" y1="21" x2="16" y2="21"/>
+                    <line x1="12" y1="17" x2="12" y2="21"/>
+                  </svg>
+                </div>
+                <div class="sec-dev-info">
+                  <div class="sec-dev-name">MacBook Pro</div>
+                  <div class="sec-dev-meta">macOS 14.5 · Last active now</div>
+                </div>
+                <span class="sec-dev-badge current">Current</span>
+                <button class="sec-dev-remove"
+                  onclick="secRemoveDevice(this)">Remove</button>
+              </div>
+              <div class="sec-dev-item">
+                <div class="sec-dev-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="5" y="2" width="14" height="20" rx="2"/>
+                    <line x1="12" y1="18" x2="12" y2="18.01"/>
+                  </svg>
+                </div>
+                <div class="sec-dev-info">
+                  <div class="sec-dev-name">iPhone 14</div>
+                  <div class="sec-dev-meta">iOS 17.4 · Last seen 2 min ago</div>
+                </div>
+                <span class="sec-dev-badge recent">Recent</span>
+                <button class="sec-dev-remove"
+                  onclick="secRemoveDevice(this)">Remove</button>
+              </div>
+              <div class="sec-dev-item">
+                <div class="sec-dev-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="4" y="2" width="16" height="20" rx="2"/>
+                    <line x1="12" y1="18" x2="12" y2="18.01"/>
+                  </svg>
+                </div>
+                <div class="sec-dev-info">
+                  <div class="sec-dev-name">iPad Air</div>
+                  <div class="sec-dev-meta">iPadOS 17.4 · Last seen 3 days ago</div>
+                </div>
+                <span class="sec-dev-badge old">Inactive</span>
+                <button class="sec-dev-remove"
+                  onclick="secRemoveDevice(this)">Remove</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Notifications Tab -->
+        <div class="modal-tab-content" id="tab-notification">
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Email Notifications</div>
+              <div class="setting-sub">
+                Receive event updates via email
+              </div>
+            </div>
+            <button class="toggle-switch on"
+              onclick="this.classList.toggle('on')">
+            </button>
+          </div>
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">SMS Notifications</div>
+              <div class="setting-sub">
+                Receive alerts via SMS
+              </div>
+            </div>
+            <button class="toggle-switch"
+              onclick="this.classList.toggle('on')">
+            </button>
+          </div>
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Event Reminders</div>
+              <div class="setting-sub">
+                Get reminded before events start
+              </div>
+            </div>
+            <button class="toggle-switch on"
+              onclick="this.classList.toggle('on')">
+            </button>
+          </div>
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Promotional Emails</div>
+              <div class="setting-sub">
+                Receive news and offers
+              </div>
+            </div>
+            <button class="toggle-switch"
+              onclick="this.classList.toggle('on')">
+            </button>
+          </div>
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Refund Updates</div>
+              <div class="setting-sub">
+                Get notified on refund status
+              </div>
+            </div>
+            <button class="toggle-switch on"
+              onclick="this.classList.toggle('on')">
+            </button>
+          </div>
+          <button class="btn btn-primary btn-full"
+            style="margin-top:16px"
+            onclick="alert('Notification preferences saved!')">
+            <i class="ri-save-line"></i> Save Preferences
+          </button>
+        </div>
+
+        <!-- Appearance Tab -->
+        <div class="modal-tab-content" id="tab-appearance">
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Dark Mode</div>
+              <div class="setting-sub">
+                Switch to dark theme
+              </div>
+            </div>
+            <button class="toggle-switch" id="darkModeToggle"
+              onclick="toggleDarkMode(this)">
+            </button>
+          </div>
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Compact View</div>
+              <div class="setting-sub">
+                Show more content on screen
+              </div>
+            </div>
+            <button class="toggle-switch"
+              onclick="this.classList.toggle('on')">
+            </button>
+          </div>
+          <div class="setting-row" style="border:none">
+            <div>
+              <div class="setting-label">Language</div>
+              <div class="setting-sub">
+                Choose your preferred language
+              </div>
+            </div>
+            <select style="padding:6px 10px;border:1px solid
+              var(--border);border-radius:var(--border-radius);
+              font-family:var(--font);font-size:13px">
+              <option>English</option>
+              <option>ខ្មែរ (Khmer)</option>
+            </select>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Profile Picture Modal -->
+  <div class="photo-modal-overlay" id="profilePhotoModal" aria-hidden="true">
+    <section class="photo-modal" role="dialog" aria-modal="true"
+      aria-labelledby="profilePhotoTitle">
+      <header class="photo-modal-header">
+        <button class="photo-icon-btn" type="button"
+          onclick="closeProfilePhotoModal()" aria-label="Close">
+          <i class="ri-close-line"></i>
+        </button>
+        <div class="photo-modal-title" id="profilePhotoTitle">
+          Add profile picture
+        </div>
+        <button class="photo-icon-btn" type="button" aria-label="More options">
+          <i class="ri-more-2-fill"></i>
+        </button>
+      </header>
+
+      <div class="avatar-gallery-wrap">
+        <div class="avatar-gallery" id="profileAvatarGallery"
+          aria-label="Profile picture illustrations"></div>
+      </div>
+
+      <div class="photo-actions">
+        <button class="photo-action-btn" type="button"
+          onclick="showProfileToast('More illustrations coming soon')">
+          <i class="ri-gallery-line"></i> See more illustrations
+        </button>
+        <button class="photo-action-btn" type="button"
+          onclick="document.getElementById('profileUploadInput').click()">
+          <i class="ri-upload-cloud-2-line"></i> Upload from Device
+        </button>
+        <button class="photo-action-btn" type="button"
+          onclick="document.getElementById('profileCameraInput').click()">
+          <i class="ri-camera-3-line"></i> Take a picture
+        </button>
+        <input class="photo-input" id="profileUploadInput"
+          type="file" accept="image/*" />
+        <input class="photo-input" id="profileCameraInput"
+          type="file" accept="image/*" capture="user" />
+      </div>
+    </section>
+  </div>
+
+  <div class="profile-toast" id="profileToast" role="status"
+    aria-live="polite">Profile picture updated</div>
+
+  <!-- ══ Refund Modal ══ -->
+  <div class="modal-overlay" id="refundModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>
+          <i class="ri-refund-2-line"></i> Request Refund
+        </h3>
+        <button class="modal-close"
+          onclick="closeRefundModal()">
+          <i class="ri-close-line"></i>
+        </button>
+      </div>
+      <div class="refund-modal-body">
+
+        <!-- Event info -->
+        <div class="card" style="margin-bottom:20px">
+          <div style="font-size:13px;color:var(--text-light);
+            margin-bottom:4px">Refund for</div>
+          <div style="font-size:15px;font-weight:600"
+            id="refundEventName">Tech Innovation Summit 2026</div>
+          <div style="font-size:13px;color:var(--text-light);
+            margin-top:4px">
+            Ticket ID: <span id="refundTicketId">TKT-001-2026</span>
+          </div>
+        </div>
+
+        <!-- Refund steps info -->
+        <div style="font-size:14px;font-weight:600;
+          margin-bottom:12px">How refund works:</div>
+        <div class="refund-steps">
+          <div class="refund-step">
+            <div class="step-num">1</div>
+            <div class="step-info">
+              <div class="s-title">Submit Request</div>
+              <div class="s-desc">
+                Fill in the reason and submit your refund request
+              </div>
+            </div>
+          </div>
+          <div class="refund-step">
+            <div class="step-num">2</div>
+            <div class="step-info">
+              <div class="s-title">Review (1–3 business days)</div>
+              <div class="s-desc">
+                Our team will review your request
+              </div>
+            </div>
+          </div>
+          <div class="refund-step">
+            <div class="step-num">3</div>
+            <div class="step-info">
+              <div class="s-title">Refund Processed</div>
+              <div class="s-desc">
+                Refund returned to original payment method
+                within 5–7 business days
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reason -->
+        <div class="form-group">
+          <label>Reason for Refund
+            <span style="color:var(--danger)">*</span>
+          </label>
+          <select id="refundReason">
+            <option value="">Select a reason</option>
+            <option>I can no longer attend</option>
+            <option>Event was cancelled</option>
+            <option>Duplicate registration</option>
+            <option>Medical emergency</option>
+            <option>Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Additional Details</label>
+          <textarea rows="3" id="refundDetails"
+            placeholder="Please provide more details..."
+            style="resize:none"></textarea>
+        </div>
+
+        <!-- Refund policy note -->
+        <div style="background:var(--bg-orange);
+          border-radius:var(--border-radius);
+          padding:12px 14px;
+          font-size:13px;
+          color:var(--text-medium);
+          margin-bottom:20px;
+          line-height:1.6">
+          <i class="ri-information-line"
+            style="color:var(--primary)"></i>
+          <strong>Refund Policy:</strong> Full refund available
+          up to 7 days before the event. 50% refund within
+          7 days. No refund within 48 hours of event.
+        </div>
+
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-outline"
+            style="flex:1" onclick="closeRefundModal()">
+            Cancel
+          </button>
+          <button class="btn btn-primary"
+            style="flex:2" onclick="submitRefund()">
+            <i class="ri-send-plane-line"></i>
+            Submit Refund Request
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+  
+  <!-- ══ Security Sub-Modals ══ -->
+
+  <!-- Step 1: Create TFA password -->
+  <div class="sec-modal-overlay" id="secModalSetup1">
+    <div class="sec-modal">
+      <div class="sec-modal-emoji">🔐</div>
+      <div class="sec-modal-title">Your Password</div>
+      <div class="sec-modal-text">Choose an additional password to protect your account.</div>
+      <div class="sec-steps">
+        <div class="sec-step-dot active"></div>
+        <div class="sec-step-dot"></div>
+        <div class="sec-step-dot"></div>
+      </div>
+      <input type="password" class="sec-modal-input"
+        placeholder="Enter password" id="secSetupPass"/>
+      <div class="sec-modal-hint">At least 6 characters</div>
+      <div class="sec-modal-actions">
+        <button class="sec-btn sec-btn-secondary"
+          onclick="closeSecModal()">Cancel</button>
+        <button class="sec-btn sec-btn-primary"
+          onclick="secGoToStep2()">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: Confirm password -->
+  <div class="sec-modal-overlay" id="secModalSetup2">
+    <div class="sec-modal">
+      <div class="sec-modal-emoji">🔐</div>
+      <div class="sec-modal-title">Confirm Password</div>
+      <div class="sec-modal-text">Re-enter your password to make sure it's correct.</div>
+      <div class="sec-steps">
+        <div class="sec-step-dot active"></div>
+        <div class="sec-step-dot active"></div>
+        <div class="sec-step-dot"></div>
+      </div>
+      <input type="password" class="sec-modal-input"
+        placeholder="Re-enter password" id="secSetupConfirm"/>
+      <div class="sec-modal-actions">
+        <button class="sec-btn sec-btn-secondary"
+          onclick="secBackToStep1()">Back</button>
+        <button class="sec-btn sec-btn-primary"
+          onclick="secGoToStep3()">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3: Recovery email -->
+  <div class="sec-modal-overlay" id="secModalSetup3">
+    <div class="sec-modal">
+      <div class="sec-modal-emoji">📧</div>
+      <div class="sec-modal-title">Recovery Email</div>
+      <div class="sec-modal-text">Add a recovery email so you can reset your password if you forget it.</div>
+      <div class="sec-steps">
+        <div class="sec-step-dot active"></div>
+        <div class="sec-step-dot active"></div>
+        <div class="sec-step-dot active"></div>
+      </div>
+      <input type="email" class="sec-modal-input"
+        placeholder="your@email.com" id="secSetupEmail"/>
+      <a href="#" class="sec-modal-link"
+        onclick="secSkipEmail(); return false;">Skip for now</a>
+      <div class="sec-modal-actions">
+        <button class="sec-btn sec-btn-secondary"
+          onclick="secBackToStep2()">Back</button>
+        <button class="sec-btn sec-btn-primary"
+          onclick="secFinishSetup()">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TFA Login (when already enabled) -->
+  <div class="sec-modal-overlay" id="secModalLogin">
+    <div class="sec-modal">
+      <div class="sec-modal-emoji">🔐</div>
+      <div class="sec-modal-title">Your Password</div>
+      <div class="sec-modal-text">Two-Step Verification is enabled. Enter your additional password to continue.</div>
+      <input type="password" class="sec-modal-input"
+        placeholder="Password" id="secLoginPass"/>
+      <a href="#" class="sec-modal-link"
+        onclick="openSecModal('forgot'); return false;">Forgot password?</a>
+      <div class="sec-modal-actions">
+        <button class="sec-btn sec-btn-secondary"
+          onclick="closeSecModal()">Cancel</button>
+        <button class="sec-btn sec-btn-primary"
+          onclick="secDoLogin()">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Forgot / Reset -->
+  <div class="sec-modal-overlay" id="secModalForgot">
+    <div class="sec-modal">
+      <div class="sec-modal-emoji">😕</div>
+      <div class="sec-modal-title">Sorry</div>
+      <div class="sec-modal-text">Since you didn't provide a recovery email, you can either remember your password or wait 7 days for a reset.</div>
+      <div class="sec-modal-actions">
+        <button class="sec-btn sec-btn-secondary"
+          onclick="closeSecModal()">Cancel</button>
+        <button class="sec-btn sec-btn-danger"
+          onclick="secStartReset()">Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Change Password -->
+  <div class="sec-modal-overlay" id="secModalPassword">
+    <div class="sec-modal">
+      <div class="sec-modal-emoji">🔑</div>
+      <div class="sec-modal-title">Change Password</div>
+      <div class="sec-modal-text">Enter your current password, then choose a new one.</div>
+      <div class="sec-pw-field">
+        <input type="password" placeholder="Current password" id="secCurrPass"/>
+        <button class="sec-pw-eye" data-target="secCurrPass">
+          <svg class="open" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          <svg class="slash" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+            <line x1="1" y1="1" x2="23" y2="23"/>
+          </svg>
+        </button>
+      </div>
+      <div class="sec-pw-field">
+        <input type="password" placeholder="New password (min 8 chars)" id="secNewPass"/>
+        <button class="sec-pw-eye" data-target="secNewPass">
+          <svg class="open" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          <svg class="slash" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+            <line x1="1" y1="1" x2="23" y2="23"/>
+          </svg>
+        </button>
+      </div>
+      <div class="sec-modal-actions">
+        <button class="sec-btn sec-btn-secondary"
+          onclick="closeSecModal()">Cancel</button>
+        <button class="sec-btn sec-btn-primary"
+          onclick="secChangePassword()">Update</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-toast" id="secToast"></div>
+
+  <script src="/assets/js/0_api.js"></script>
+  <script src="/assets/js/1_navbar.js"></script>
+  <script type="module" src="/assets/js/4_dashboard.js"></script>
+  <script>
+
+    // ── Protect page ──
+    const BYPASS_AUTH = true;
+    if (!BYPASS_AUTH) {
+        requireAuth();
+        requireRole(["Attendee"]);
+    }
+
+    // ── Tab switching ──
+    function switchEventTab(filter, btn) {
+      const btns = document.querySelectorAll(".tab-filter-btn");
+      btns.forEach((b) => b.classList.remove("active"));
+      if (btn) {
+        btn.classList.add("active");
+      } else {
+        // Called programmatically (e.g. on load) — activate the matching tab.
+        const idx = filter === "past" ? 1 : 0;
+        if (btns[idx]) btns[idx].classList.add("active");
+      }
+      renderMyEvents(filter);
+    }
+
+    // ── Profile Settings Modal ──
+    function openProfileSettings() {
+      const user = getCurrentUser();
+      if (user) {
+        applySavedProfilePhoto(user);
+        document.getElementById("profileFullName").textContent =
+          user.firstName + " " + user.lastName;
+        document.getElementById("profileEmail").textContent =
+          user.email;
+        document.getElementById("editFirstName").value =
+          user.firstName;
+        document.getElementById("editLastName").value =
+          user.lastName;
+        document.getElementById("editEmail").value =
+          user.email;
+      }
+      document.getElementById("profileModal")
+        .classList.add("open");
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeProfileSettings() {
+      document.getElementById("profileModal")
+        .classList.remove("open");
+      document.body.style.overflow = "";
+    }
+
+    const profileIllustrations = [
+      ["#f5c6a5", "#2f2f35", "#f97316", "short"],
+      ["#8d5524", "#111827", "#8b5cf6", "curly"],
+      ["#ddb892", "#7c2d12", "#22c55e", "long"],
+      ["#c68642", "#3f2a1d", "#3b82f6", "bun"],
+      ["#ffdbac", "#111827", "#a16207", "bob"],
+      ["#a47148", "#4b5563", "#14b8a6", "ponytail"],
+      ["#e0ac69", "#92400e", "#ec4899", "waves"],
+      ["#6f4e37", "#18181b", "#6366f1", "fade"],
+      ["#f1c27d", "#78350f", "#84cc16", "side"],
+      ["#b78565", "#1f2937", "#06b6d4", "cap"],
+      ["#ffd7b5", "#6b21a8", "#ef4444", "pixie"],
+      ["#9c6644", "#292524", "#10b981", "locks"],
+      ["#d4a373", "#020617", "#f59e0b", "mop"],
+      ["#7f5539", "#422006", "#2563eb", "bun2"],
+      ["#f2cc8f", "#334155", "#9333ea", "long2"]
+    ];
+
+    function hairShape(type, color) {
+      const shapes = {
+        short: `<path d="M22 35c2-17 36-19 40 0v12H22z" fill="${color}"/>`,
+        curly: `<g fill="${color}"><circle cx="25" cy="34" r="9"/><circle cx="35" cy="25" r="10"/><circle cx="47" cy="25" r="10"/><circle cx="57" cy="35" r="9"/><path d="M23 38h38v12H23z"/></g>`,
+        long: `<path d="M19 35c0-20 44-23 50 0 2 12-4 26-8 34H26c-5-10-8-22-7-34z" fill="${color}"/>`,
+        bun: `<g fill="${color}"><circle cx="44" cy="21" r="11"/><path d="M22 36c4-18 39-18 44 0v14H22z"/></g>`,
+        bob: `<path d="M21 35c2-21 44-21 46 0v26H21z" fill="${color}"/>`,
+        ponytail: `<g fill="${color}"><path d="M22 36c2-18 39-20 43 0v13H22z"/><path d="M61 36c13 7 9 24-2 29 4-12 2-20-4-25z"/></g>`,
+        waves: `<path d="M20 37c5-25 44-20 48 0 1 8-3 15-8 20-1-10-6-17-16-17s-17 7-20 17c-4-6-6-12-4-20z" fill="${color}"/>`,
+        fade: `<path d="M23 35c3-16 39-18 42 0v10H23z" fill="${color}"/>`,
+        side: `<path d="M20 39c1-22 42-25 49-1-13-4-25-4-47 8z" fill="${color}"/>`,
+        cap: `<g><path d="M20 37c5-18 42-18 48 0H20z" fill="${color}"/><path d="M18 38h34c-6 7-22 8-34 4z" fill="#111827"/></g>`,
+        pixie: `<path d="M22 35c7-18 34-18 43 0-14-3-25 1-41 10z" fill="${color}"/>`,
+        locks: `<g fill="${color}"><path d="M22 33c3-18 40-19 44 1v20H22z"/><circle cx="23" cy="46" r="5"/><circle cx="65" cy="46" r="5"/></g>`,
+        mop: `<g fill="${color}"><circle cx="28" cy="33" r="8"/><circle cx="38" cy="27" r="9"/><circle cx="50" cy="28" r="9"/><circle cx="60" cy="35" r="8"/></g>`,
+        bun2: `<g fill="${color}"><circle cx="29" cy="31" r="8"/><circle cx="59" cy="31" r="8"/><path d="M22 39c4-19 39-19 44 0v11H22z"/></g>`,
+        long2: `<path d="M18 36c3-24 49-24 52 0 2 13-4 24-9 33H27c-6-10-11-21-9-33z" fill="${color}"/>`
+      };
+      return shapes[type] || shapes.short;
+    }
+
+    function buildProfileAvatarSvg(avatar, index) {
+      const [skin, hair, shirt, type] = avatar;
+      const bg = ["#fff1d6", "#dbeafe", "#ffe4e6", "#dcfce7", "#ede9fe"][index % 5];
+      return `
+        <svg viewBox="0 0 88 88" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="44" cy="44" r="44" fill="${bg}"/>
+          ${hairShape(type, hair)}
+          <circle cx="44" cy="43" r="20" fill="${skin}"/>
+          <path d="M34 61c4 5 16 5 20 0v12H34z" fill="${skin}"/>
+          <circle cx="37" cy="43" r="2" fill="#1f2937"/>
+          <circle cx="51" cy="43" r="2" fill="#1f2937"/>
+          <path d="M37 52c4 4 10 4 14 0" fill="none" stroke="#7f1d1d" stroke-width="2" stroke-linecap="round"/>
+          <path d="M21 88c3-20 15-31 23-31s20 11 23 31z" fill="${shirt}"/>
+          <path d="M32 70c5 5 19 5 24 0" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="2" stroke-linecap="round"/>
+        </svg>`;
+    }
+
+    function setAvatarInitial(user) {
+      const initial = user && user.firstName
+        ? user.firstName.charAt(0).toUpperCase()
+        : "?";
+      const avatar = document.getElementById("avatarInitial");
+      if (avatar) avatar.textContent = initial;
+    }
+
+    function applySavedProfilePhoto(user) {
+      const avatar = document.getElementById("avatarInitial");
+      if (!avatar) return;
+
+      const savedPhoto = localStorage.getItem("erms_profile_photo");
+      if (savedPhoto) {
+        avatar.innerHTML = savedPhoto;
+      } else {
+        setAvatarInitial(user);
+      }
+    }
+
+    function openProfilePhotoModal() {
+      const modal = document.getElementById("profilePhotoModal");
+      modal.classList.add("open");
+      modal.setAttribute("aria-hidden", "false");
+      document.body.style.overflow = "hidden";
+      renderProfileAvatarGallery();
+    }
+
+    function closeProfilePhotoModal() {
+      const modal = document.getElementById("profilePhotoModal");
+      modal.classList.remove("open");
+      modal.setAttribute("aria-hidden", "true");
+      if (!document.getElementById("profileModal").classList.contains("open")) {
+        document.body.style.overflow = "";
+      }
+    }
+
+    function showProfileToast(message) {
+      const toast = document.getElementById("profileToast");
+      toast.textContent = message;
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 1800);
+    }
+
+    function setProfilePhoto(markup, selectedIndex) {
+      document.getElementById("avatarInitial").innerHTML = markup;
+      localStorage.setItem("erms_profile_photo", markup);
+      if (selectedIndex !== undefined) {
+        localStorage.setItem("erms_profile_photo_index", selectedIndex);
+      } else {
+        localStorage.removeItem("erms_profile_photo_index");
+      }
+      showProfileToast("Profile picture updated");
+      setTimeout(closeProfilePhotoModal, 650);
+    }
+
+    function renderProfileAvatarGallery() {
+      const gallery = document.getElementById("profileAvatarGallery");
+      if (!gallery || gallery.dataset.ready === "true") return;
+
+      const savedIndex = localStorage.getItem("erms_profile_photo_index");
+      gallery.innerHTML = profileIllustrations.map((avatar, index) => `
+        <button class="avatar-option${String(index) === savedIndex ? " selected" : ""}"
+          type="button" aria-label="Select profile illustration ${index + 1}"
+          data-index="${index}">
+          ${buildProfileAvatarSvg(avatar, index)}
+        </button>
+      `).join("");
+
+      gallery.querySelectorAll(".avatar-option").forEach((button) => {
+        button.addEventListener("click", () => {
+          gallery.querySelectorAll(".avatar-option")
+            .forEach((item) => item.classList.remove("selected"));
+          button.classList.add("selected");
+          setProfilePhoto(button.innerHTML, button.dataset.index);
+        });
+      });
+
+      gallery.dataset.ready = "true";
+    }
+
+    function setProfilePhotoFromFile(file) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        setProfilePhoto(`<img src="${reader.result}" alt="Selected profile picture">`);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    document.getElementById("profileUploadInput")
+      .addEventListener("change", (event) => {
+        setProfilePhotoFromFile(event.target.files[0]);
+      });
+
+    document.getElementById("profileCameraInput")
+      .addEventListener("change", (event) => {
+        setProfilePhotoFromFile(event.target.files[0]);
+      });
+
+    document.getElementById("profilePhotoModal")
+      .addEventListener("click", (event) => {
+        if (event.target.id === "profilePhotoModal") closeProfilePhotoModal();
+      });
+
+    // ── Security modals ──
+    let tfaEnabled = false;
+
+    function secToast(msg) {
+      const t = document.getElementById('secToast');
+      if (!t) return;
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2200);
+    }
+
+    function openSecModal(type) {
+      closeSecModal();
+      if (type === 'setup') {
+        if (tfaEnabled) {
+          document.getElementById('secModalLogin').classList.add('show');
+        } else {
+          document.getElementById('secModalSetup1').classList.add('show');
+          setTimeout(() => document.getElementById('secSetupPass').focus(), 100);
+        }
+      } else if (type === 'password') {
+        document.getElementById('secModalPassword').classList.add('show');
+      } else if (type === 'forgot') {
+        document.getElementById('secModalForgot').classList.add('show');
+      }
+    }
+
+    function closeSecModal() {
+      document.querySelectorAll('.sec-modal-overlay')
+        .forEach(m => m.classList.remove('show'));
+    }
+
+    function secGoToStep2() {
+      const pass = document.getElementById('secSetupPass').value;
+      if (pass.length < 6) { secToast('Password must be at least 6 characters'); return; }
+      closeSecModal();
+      document.getElementById('secModalSetup2').classList.add('show');
+      setTimeout(() => document.getElementById('secSetupConfirm').focus(), 100);
+    }
+    function secBackToStep1() {
+      closeSecModal();
+      document.getElementById('secModalSetup1').classList.add('show');
+    }
+    function secGoToStep3() {
+      const pass = document.getElementById('secSetupPass').value;
+      const conf = document.getElementById('secSetupConfirm').value;
+      if (pass !== conf) { secToast('Passwords do not match'); return; }
+      closeSecModal();
+      document.getElementById('secModalSetup3').classList.add('show');
+      setTimeout(() => document.getElementById('secSetupEmail').focus(), 100);
+    }
+    function secBackToStep2() {
+      closeSecModal();
+      document.getElementById('secModalSetup2').classList.add('show');
+    }
+    function secSkipEmail() { secFinishSetup(); }
+    function secFinishSetup() {
+      tfaEnabled = true;
+      const s = document.getElementById('tfaStatus');
+      if (s) { s.textContent = 'On'; s.classList.remove('off'); }
+      closeSecModal();
+      secToast('Two-Step Verification enabled ✓');
+    }
+    function secDoLogin() {
+      const pass = document.getElementById('secLoginPass').value;
+      if (!pass) { secToast('Please enter your password'); return; }
+      closeSecModal();
+      secToast('Signed in successfully');
+    }
+    function secStartReset() {
+      closeSecModal();
+      secToast('Reset request sent. Check back in 7 days.');
+    }
+    function secChangePassword() {
+      const curr = document.getElementById('secCurrPass').value;
+      const nw   = document.getElementById('secNewPass').value;
+      if (!curr || !nw) { secToast('Please fill in all fields'); return; }
+      if (nw.length < 8) { secToast('New password must be at least 8 characters'); return; }
+      closeSecModal();
+      secToast('Password updated successfully ✓');
+    }
+    function secRemoveDevice(btn) {
+      const item = btn.closest('.sec-dev-item');
+      const name = item.querySelector('.sec-dev-name').textContent;
+      item.style.transition = 'all 0.3s ease';
+      item.style.opacity = '0';
+      item.style.transform = 'translateX(20px)';
+      setTimeout(() => {
+        item.remove();
+        secToast(name + ' removed');
+        const list = document.querySelector('.sec-dev-list');
+        if (list && list.children.length === 0) {
+          list.innerHTML = '<div style="text-align:center;padding:28px;color:var(--text-light);font-size:13px">No devices connected</div>';
+        }
+      }, 300);
+    }
+
+    document.querySelectorAll('.sec-pw-eye').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const input = document.getElementById(btn.dataset.target);
+        const showing = btn.classList.toggle('showing');
+        if (input) input.type = showing ? 'text' : 'password';
+      });
+    });
+
+    document.querySelectorAll('.sec-modal-overlay').forEach(overlay => {
+      overlay.addEventListener('click', e => {
+        if (e.target === overlay) closeSecModal();
+      });
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeSecModal();
+    });
+
+    function switchModalTab(tabId, btn) {
+      document.querySelectorAll(".modal-tab")
+        .forEach((t) => t.classList.remove("active"));
+      document.querySelectorAll(".modal-tab-content")
+        .forEach((c) => c.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById(tabId).classList.add("active");
+    }
+
+    function saveProfile() {
+      const firstName =
+        document.getElementById("editFirstName").value.trim();
+      const lastName  =
+        document.getElementById("editLastName").value.trim();
+      const email     =
+        document.getElementById("editEmail").value.trim();
+
+      if (!firstName || !lastName || !email) {
+        alert("Please fill in all required fields."); return;
+      }
+
+      const user = getCurrentUser();
+      const updated = { ...user, firstName, lastName, email };
+      localStorage.setItem("erms_user", JSON.stringify(updated));
+
+      alert("Profile updated successfully!");
+      closeProfileSettings();
+      location.reload();
+    }
+
+    // ── Dark Mode ──
+    // Real theme toggle (class-based, persisted) lives in 1_navbar.js as the
+    // global toggleDarkMode(). The old invert(1) hue-rotate hack was removed
+    // because it distorted colors and images.
+
+    // ── Refund Modal ──
+    let _currentRefundTicket = null;
+
+    function openRefundModal(eventName, ticketId) {
+      const refunds = JSON.parse(localStorage.getItem('erms_refunds') || '[]');
+      const existing = refunds.find(r => r.ticketCode === ticketId);
+      if (existing) {
+        const labels = { pending: 'Pending Review', approved: 'Approved', rejected: 'Rejected' };
+        alert('Refund already submitted.\nStatus: ' + (labels[existing.status] || existing.status));
+        return;
+      }
+      _currentRefundTicket = ticketId;
+      document.getElementById("refundEventName").textContent = eventName;
+      document.getElementById("refundTicketId").textContent = ticketId;
+      document.getElementById("refundReason").value = "";
+      document.getElementById("refundDetails").value = "";
+      document.getElementById("refundModal").classList.add("open");
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeRefundModal() {
+      document.getElementById("refundModal").classList.remove("open");
+      document.body.style.overflow = "";
+    }
+
+    function submitRefund() {
+      const reason = document.getElementById("refundReason").value;
+      const details = document.getElementById("refundDetails").value;
+      if (!reason) { alert("Please select a reason for refund."); return; }
+      const refunds = JSON.parse(localStorage.getItem('erms_refunds') || '[]');
+      refunds.push({
+        ticketCode: _currentRefundTicket,
+        eventName: document.getElementById("refundEventName").textContent,
+        reason,
+        details,
+        status: 'pending',
+        requestedAt: new Date().toISOString()
+      });
+      localStorage.setItem('erms_refunds', JSON.stringify(refunds));
+      closeRefundModal();
+      renderMyEvents(document.querySelector('.tab-filter-btn.active')?.textContent.includes('Past') ? 'past' : 'upcoming');
+      alert("Refund request submitted!\n\nOur team will review your request within 1-3 business days.");
+    }
+
+    // ── Attendee registrations (mock data — single source of truth) ──
+    const myRegistrations = {
+      upcoming: [
+        {
+          title: "Tech Innovation Summit 2026",
+          date: "April 30, 2026",
+          time: "9:00 AM - 5:00 PM",
+          location: "Prey Veng Province",
+          price: 250,
+          status: "confirmed",
+          ticketCode: "TKT-001-2026",
+          image: "/assets/images/Technology.png"
+        },
+        {
+          title: "Digital Marketing Workshop",
+          date: "March 20, 2026",
+          time: "9:00 AM - 4:00 PM",
+          location: "Phnom Penh, RUPP",
+          price: 300,
+          status: "confirmed",
+          ticketCode: "TKT-002-2026",
+          image: "/assets/images/Workshop.png"
+        }
+      ],
+      past: []
+    };
+
+    function setStat(id, val) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    }
+
+    // ── Called on load by 4_dashboard.js (typeof check) ──
+    function initAttendeeDashboard() {
+      const all = [...myRegistrations.upcoming, ...myRegistrations.past];
+      const spent = all.reduce((sum, e) => sum + (e.price || 0), 0);
+
+      setStat("statTotalEvents", all.length);
+      setStat("statUpcoming", myRegistrations.upcoming.length);
+      setStat("statTotalSpent", "$" + spent);
+
+      // Dynamic tab counts (no longer hardcoded)
+      const btns = document.querySelectorAll(".tab-filter-btn");
+      if (btns[0]) btns[0].textContent = `Upcoming Events (${myRegistrations.upcoming.length})`;
+      if (btns[1]) btns[1].textContent = `Past Events (${myRegistrations.past.length})`;
+
+      switchEventTab("upcoming");
+    }
+
+    // ── Open a ticket: stash its data so the ticket page can render it (mock mode) ──
+    function openMyTicket(filter, i) {
+      const list = filter === "past" ? myRegistrations.past : myRegistrations.upcoming;
+      const evt = list[i];
+      if (!evt) return;
+      localStorage.setItem("erms_ticket_code", evt.ticketCode);
+      localStorage.setItem("erms_ticket_event", JSON.stringify(evt));
+      window.location.href = "/pages/10_ticket.html";
+    }
+
+    function renderMyEvents(filter) {
+      const grid = document.getElementById("myEventsGrid");
+      if (!grid) return;
+
+      const events = filter === "past" ? myRegistrations.past : myRegistrations.upcoming;
+      const refunds = JSON.parse(localStorage.getItem('erms_refunds') || '[]');
+
+      if (events.length === 0) {
+        grid.innerHTML = '<div class="empty-state"><p>No ' + filter + ' events found.</p></div>';
+        return;
+      }
+
+      const refundBadge = { pending: 'refund-pending', approved: 'refund-approved', rejected: 'refund-rejected' };
+      const refundLabel = { pending: 'Refund Pending', approved: 'Refund Approved', rejected: 'Refund Rejected' };
+
+      grid.innerHTML = events.map((e, i) => {
+        const refund = refunds.find(r => r.ticketCode === e.ticketCode);
+        const refundTag = refund
+          ? `<span class="badge ${refundBadge[refund.status] || 'badge-cancelled'}" style="margin-left:6px">
+               <i class="ri-refund-2-line"></i> ${refundLabel[refund.status] || refund.status}
+             </span>`
+          : '';
+        const cancelBtn = refund
+          ? `<button class="btn btn-outline btn-sm" disabled style="opacity:0.5;cursor:not-allowed">
+               <i class="ri-close-circle-line"></i> ${refundLabel[refund.status]}
+             </button>`
+          : `<button class="btn btn-danger btn-sm" onclick="openRefundModal('${e.title.replace(/'/g,"\\'")}', '${e.ticketCode}')">
+               <i class="ri-close-circle-line"></i> Request Refund
+             </button>`;
+        return `
+        <div class="event-list-item">
+          <div class="event-list-img">
+            <img src="${e.image}" alt="${e.title}" onerror="this.src='/assets/images/Sport%20event.jpg'" />
+            <span class="price-tag">$${e.price}</span>
+          </div>
+          <div class="event-list-info">
+            <div class="event-list-header">
+              <span class="badge badge-${e.status}">${e.status}</span>${refundTag}
+              <span class="ticket-id">Ticket: ${e.ticketCode}</span>
+            </div>
+            <h3>${e.title}</h3>
+            <div class="event-meta">
+              <div class="event-meta-item"><i class="ri-calendar-line"></i> ${e.date}</div>
+              <div class="event-meta-item"><i class="ri-map-pin-line"></i> ${e.location}</div>
+            </div>
+            <div class="event-list-actions">
+              <button class="btn btn-primary btn-sm" onclick="openMyTicket('${filter}', ${i})">
+                <i class="ri-qr-code-line"></i> View QR Ticket
+              </button>
+              <button class="btn btn-outline btn-sm" onclick="openMyTicket('${filter}', ${i}); setTimeout(()=>window.print(),400)">
+                <i class="ri-download-line"></i> Download
+              </button>
+              ${cancelBtn}
+            </div>
+          </div>
+        </div>`;
+      }).join("");
+    }
+
+    // Close modals when clicking outside
+    document.querySelectorAll(".modal-overlay")
+      .forEach((overlay) => {
+        overlay.addEventListener("click", (e) => {
+          if (e.target === overlay) {
+            overlay.classList.remove("open");
+            document.body.style.overflow = "";
+          }
+        });
+      });
+
+  </script>
+  <script src="/assets/js/7_cursor.js"></script>
+</body>
+</html>

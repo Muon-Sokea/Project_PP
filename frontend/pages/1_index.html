@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Planning Center — Discover Events</title>
+<link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet" />
+<link rel="stylesheet" href="../assets/css/1_global.css" />
+<link rel="stylesheet" href="../assets/css/2_navbar.css" />
+<link rel="stylesheet" href="../assets/css/3_hero.css" />
+<link rel="stylesheet" href="../assets/css/4_events.css" />
+<link rel="stylesheet" href="../assets/css/8_testimonials.css" />
+<link rel="stylesheet" href="../assets/css/10_features.css" />
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <a class="nav-logo" href="/pages/1_index.html">
+      <span class="logo-top">Planning</span>
+      <span class="logo-bottom">Center</span>
+    </a>
+    <button class="hamburger" id="hamburger" aria-label="Toggle menu">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="nav-links" id="navLinks">
+      <button class="btn btn-primary">
+        <i class="ri-home-line"></i> Home
+      </button>
+      <button class="btn btn-outline" onclick="goToDashboard()">
+        <i class="ri-dashboard-line"></i> Dashboard
+      </button>
+      <button class="btn btn-outline" onclick="logout()">
+        <i class="ri-logout-box-r-line"></i> Logout
+      </button>
+    </div>
+  </nav>
+
+  <!-- Hero Slideshow -->
+  <section class="hero">
+    <div class="hero-slides">
+      <div class="hero-slide"></div>
+      <div class="hero-slide"></div>
+      <div class="hero-slide"></div>
+      <div class="hero-slide"></div>
+      <div class="hero-slide clone"></div>
+    </div>
+    <div class="hero-overlay"></div>
+    <div class="hero-content">
+      <h1>Discover Amazing Events</h1>
+      <p>Join thousands of attendees at conferences,
+        workshops, and networking events</p>
+      <div class="search-wrap">
+        <div class="search-bar">
+          <input type="text" id="searchInput" autocomplete="off"
+            role="combobox" aria-expanded="false" aria-autocomplete="list"
+            aria-controls="searchSuggestions" aria-label="Search events"
+            placeholder="Search events, categories, locations…" />
+          <button class="search-btn" onclick="handleSearch()" aria-label="Search">
+            <i class="ri-search-line" aria-hidden="true"></i>
+          </button>
+        </div>
+        <ul class="search-suggestions" id="searchSuggestions"
+          role="listbox" aria-label="Search suggestions"></ul>
+      </div>
+    </div>
+    <div class="hero-dots">
+      <button class="hero-dot active" onclick="goToSlide(0)"></button>
+      <button class="hero-dot" onclick="goToSlide(1)"></button>
+      <button class="hero-dot" onclick="goToSlide(2)"></button>
+      <button class="hero-dot" onclick="goToSlide(3)"></button>
+    </div>
+  </section>
+
+  <!-- Stats Bar -->
+  <section class="stats-bar">
+    <div class="stat-item">
+      <div class="stat-icon">
+        <i class="ri-calendar-check-line"></i>
+      </div>
+      <div class="stat-number">150+</div>
+      <div class="stat-label">Upcoming Events</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-icon">
+        <i class="ri-group-line"></i>
+      </div>
+      <div class="stat-number">50K+</div>
+      <div class="stat-label">Total Attendees</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-icon">
+        <i class="ri-bar-chart-line"></i>
+      </div>
+      <div class="stat-number">90%</div>
+      <div class="stat-label">Satisfaction Rate</div>
+    </div>
+  </section>
+
+  <!-- Events Catalog -->
+  <main class="events-section">
+    <div class="filter-row">
+      <i class="ri-filter-3-line"
+        style="color:var(--text-medium)"></i>
+      <span style="font-weight:500">Filter by Category</span>
+      <button class="filter-pill active" data-category="All"
+        onclick="filterByCategory('All')">All</button>
+      <button class="filter-pill" data-category="Technology"
+        onclick="filterByCategory('Technology')">Technology</button>
+      <button class="filter-pill" data-category="Sports"
+        onclick="filterByCategory('Sports')">Sports</button>
+      <button class="filter-pill" data-category="Education"
+        onclick="filterByCategory('Education')">Education</button>
+      <button class="filter-pill" data-category="Workshop"
+        onclick="filterByCategory('Workshop')">Workshop</button>
+      <button class="filter-pill" data-category="Business"
+        onclick="filterByCategory('Business')">Business</button>
+      <button class="filter-pill" data-category="Entertainment"
+        onclick="filterByCategory('Entertainment')">Entertainment</button>
+      <button class="filter-pill" data-category="Networking"
+        onclick="filterByCategory('Networking')">Networking</button>
+      <button class="filter-pill" data-category="Healthcare"
+        onclick="filterByCategory('Healthcare')">Healthcare</button>
+    </div>
+    <div class="events-grid" id="eventsGrid">
+      <div class="spinner"></div>
+    </div>
+    <div id="seeMoreContainer" style="text-align:center;padding:32px 0;display:none;gap:12px;justify-content:center;flex-wrap:wrap;">
+      <button class="btn btn-outline" onclick="showMore()" id="seeMoreBtn">
+        <i class="ri-arrow-down-line"></i> See More Events
+        <span id="seeMoreCount" style="margin-left:6px;font-size:0.85em;opacity:0.7;"></span>
+      </button>
+      <button class="btn btn-outline" onclick="showLess()" id="seeLessBtn" style="display:none">
+        <i class="ri-arrow-up-line"></i> See Less
+        <span id="seeLessCount" style="margin-left:6px;font-size:0.85em;opacity:0.7;"></span>
+      </button>
+    </div>
+  </main>
+
+  <!-- Features -->
+  <section class="features" aria-labelledby="featuresHeading">
+    <div class="features-head">
+      <span class="eyebrow">Why Planning Center</span>
+      <h2 id="featuresHeading">Everything you need to attend &amp; host events</h2>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon blue"><i class="ri-calendar-check-line" aria-hidden="true"></i></div>
+        <h3>Browse &amp; Register</h3>
+        <p>Filter events by category and reserve your spot in seconds — no paperwork, no queues.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon green"><i class="ri-qr-code-line" aria-hidden="true"></i></div>
+        <h3>Digital QR Tickets</h3>
+        <p>Your scannable ticket lands in your dashboard instantly. Show up, scan, you're in.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon purple"><i class="ri-line-chart-line" aria-hidden="true"></i></div>
+        <h3>Real-time Seat Tracking</h3>
+        <p>Live capacity updates so organizers never oversell and you always know what's left.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Testimonials -->
+  <section class="testimonials" aria-labelledby="testiHeading">
+    <div class="testi-header">
+      <span class="testi-eyebrow">Loved by thousands</span>
+      <h2 id="testiHeading">What our community says</h2>
+    </div>
+    <div class="testi-rows" id="testiRows"></div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-top">
+
+      <!-- Brand -->
+      <div class="footer-brand">
+        <div class="footer-logo">
+          <span class="logo-top">Planning</span>
+          <span class="logo-bottom">Center</span>
+        </div>
+        <p class="footer-desc">
+          Your all-in-one platform to discover, register,
+          and manage events across Cambodia and Southeast Asia.
+        </p>
+        <div class="footer-socials">
+          <a href="#" class="footer-social-btn" aria-label="Facebook">
+            <i class="ri-facebook-fill"></i>
+          </a>
+          <a href="#" class="footer-social-btn" aria-label="Instagram">
+            <i class="ri-instagram-line"></i>
+          </a>
+          <a href="#" class="footer-social-btn" aria-label="Twitter">
+            <i class="ri-twitter-x-line"></i>
+          </a>
+          <a href="#" class="footer-social-btn" aria-label="LinkedIn">
+            <i class="ri-linkedin-fill"></i>
+          </a>
+        </div>
+      </div>
+
+      <!-- Quick Links -->
+      <div class="footer-col">
+        <h4 class="footer-heading">Quick Links</h4>
+        <ul class="footer-links">
+          <li>
+            <a href="/pages/1_index.html">
+              <i class="ri-arrow-right-s-line"></i> Home
+            </a>
+          </li>
+          <li>
+            <a href="2_login.html">
+              <i class="ri-arrow-right-s-line"></i> Sign In
+            </a>
+          </li>
+          <li>
+            <a href="3_register.html">
+              <i class="ri-arrow-right-s-line"></i> Create Account
+            </a>
+          </li>
+          <li>
+            <a href="#">
+              <i class="ri-arrow-right-s-line"></i> Browse Events
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Categories -->
+      <div class="footer-col">
+        <h4 class="footer-heading">Categories</h4>
+        <ul class="footer-links">
+          <li>
+            <a href="#" onclick="filterByCategory('Technology');
+              return false;">
+              <i class="ri-arrow-right-s-line"></i> Technology
+            </a>
+          </li>
+          <li>
+            <a href="#" onclick="filterByCategory('Business');
+              return false;">
+              <i class="ri-arrow-right-s-line"></i> Business
+            </a>
+          </li>
+          <li>
+            <a href="#" onclick="filterByCategory('Education');
+              return false;">
+              <i class="ri-arrow-right-s-line"></i> Education
+            </a>
+          </li>
+          <li>
+            <a href="#" onclick="filterByCategory('Sports');
+              return false;">
+              <i class="ri-arrow-right-s-line"></i> Sports
+            </a>
+          </li>
+          <li>
+            <a href="#" onclick="filterByCategory('Entertainment');
+              return false;">
+              <i class="ri-arrow-right-s-line"></i> Entertainment
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Contact -->
+      <div class="footer-col">
+        <h4 class="footer-heading">Contact Us</h4>
+        <ul class="footer-links">
+          <li>
+            <i class="ri-map-pin-line"></i>
+            Russian Federation Blvd,
+            Phnom Penh, Cambodia
+          </li>
+          <li>
+            <i class="ri-phone-line"></i>
+            +855 23 123 456
+          </li>
+          <li>
+            <i class="ri-mail-line"></i>
+            support@planningcenter.com
+          </li>
+          <li>
+            <i class="ri-time-line"></i>
+            Mon – Fri, 8:00 AM – 5:00 PM
+          </li>
+        </ul>
+      </div>
+
+    </div>
+
+    <!-- Footer Bottom -->
+    <div class="footer-bottom">
+      <p>© 2026 Planning Center. All rights reserved.</p>
+      <div class="footer-bottom-links">
+        <a href="/privacy-policy.html">Privacy Policy</a>
+        <a href="/terms-of-service.html">Terms of Service</a>
+        <a href="/cookie-policy.html">Cookie Policy</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="../assets/js/0_api.js"></script>
+  <script src="../assets/js/1_navbar.js"></script>
+  <script src="../assets/js/2_events.js"></script>
+  <script type="module" src="../assets/js/2_events_api.js"></script>
+  <script src="../assets/js/6_testimonials.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const user = localStorage.getItem("erms_user");
+      if (!user) {
+        window.location.href = "/pages/2_login.html";
+      }
+    });
+  </script>
+
+  <script src="../assets/js/7_cursor.js"></script>
+
+
+</body>
+</html>

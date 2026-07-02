@@ -1,0 +1,1612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Planning Center — Super Admin Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="/assets/css/1_global.css" />
+  <link rel="stylesheet" href="/assets/css/2_navbar.css" />
+  <link rel="stylesheet" href="/assets/css/6_dashboard.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <style>
+    /* ── Extra styles for supervisor ── */
+    .role-filter {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .role-pill {
+      padding: 6px 16px;
+      border-radius: 20px;
+      border: 1.5px solid var(--border);
+      background: var(--bg-white);
+      font-size: 13px;
+      font-weight: 500;
+      font-family: var(--font);
+      color: var(--text-medium);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .role-pill:hover  { border-color: var(--primary); color: var(--primary); }
+    .role-pill.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+    .table-search {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--border);
+      border-radius: var(--border-radius);
+      padding: 8px 14px;
+      background: var(--bg-white);
+      margin-bottom: 16px;
+      max-width: 340px;
+    }
+    .table-search i  { color: var(--text-light); }
+    .table-search input {
+      border: none;
+      outline: none;
+      font-size: 13px;
+      font-family: var(--font);
+      width: 100%;
+      background: transparent;
+    }
+    .financial-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px,1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .financial-card {
+      background: var(--bg-white);
+      border: 1px solid var(--border);
+      border-radius: var(--border-radius-lg);
+      padding: 20px;
+    }
+    .financial-card .f-label {
+      font-size: 13px;
+      color: var(--text-light);
+      margin-bottom: 6px;
+    }
+    .financial-card .f-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-dark);
+      margin-bottom: 4px;
+    }
+    .financial-card .f-trend {
+      font-size: 12px;
+      color: var(--success);
+    }
+    .health-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .service-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+    }
+    .service-row:last-child { border: none; }
+    .service-ok  { color: var(--success); font-weight: 500; }
+    .service-bad { color: var(--danger);  font-weight: 500; }
+
+    /* ── Modals ── */
+    .modal-overlay {
+      position:fixed; inset:0; background:rgba(15,23,42,.55);
+      display:none; align-items:center; justify-content:center; z-index:1000; padding:16px;
+      backdrop-filter:blur(2px);
+    }
+    .modal-overlay.show { display:flex; }
+    .modal-box {
+      background:var(--bg-white); border-radius:var(--border-radius-lg);
+      width:100%; max-width:460px; padding:24px; box-shadow:0 24px 60px rgba(0,0,0,.3);
+      animation:modalpop .25s ease;
+    }
+    @keyframes modalpop { from { opacity:0; transform:translateY(14px) scale(.98); } to { opacity:1; transform:none; } }
+    .modal-head { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+    .modal-head h3 { font-size:18px; font-weight:700; color:var(--text-dark); margin:0; }
+    .modal-head .m-close {
+      margin-left:auto; border:none; background:transparent; font-size:22px;
+      color:var(--text-light); cursor:pointer; line-height:1;
+    }
+    .modal-icon {
+      width:44px; height:44px; border-radius:12px; display:flex; align-items:center;
+      justify-content:center; font-size:22px; flex-shrink:0;
+    }
+    .modal-icon.danger { background:#fee2e2; color:#dc2626; }
+    .modal-icon.info   { background:#dbeafe; color:#1d4ed8; }
+    .field-label { display:block; font-size:13px; font-weight:600; color:var(--text-medium); margin:14px 0 6px; }
+    .field-select {
+      width:100%; padding:10px 12px; border:1px solid var(--border);
+      border-radius:var(--border-radius); font-family:var(--font); font-size:14px;
+      background:var(--bg-white); color:var(--text-dark);
+    }
+    .modal-actions { display:flex; gap:10px; margin-top:22px; }
+    .modal-actions .btn { flex:1; justify-content:center; }
+    .modal-text { font-size:14px; color:var(--text-medium); line-height:1.55; }
+    .modal-text strong { color:var(--text-dark); }
+    .section-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:10px; }
+    .muted-row td { opacity:.55; }
+    .badge-role-admin     { background:#dbeafe; color:#1d4ed8; }
+    .badge-role-organizer { background:#fce7f3; color:#be185d; }
+    .badge-role-attendee  { background:#dcfce7; color:#15803d; }
+    .badge-role-supervisor{ background:#fef9c3; color:#a16207; }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .toggle-row:last-child { border: none; }
+    .t-label { font-size: 14px; font-weight: 500; }
+    .t-sub   { font-size: 12px; color: var(--text-light); margin-top:2px; }
+    .toggle-switch {
+      position: relative;
+      width: 44px; height: 24px;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+    .toggle-switch::after {
+      content: "";
+      position: absolute;
+      width: 18px; height: 18px;
+      background: var(--bg-white);
+      border-radius: 50%;
+      top: 3px; left: 3px;
+      transition: transform 0.2s;
+    }
+    .toggle-switch.on  { background: var(--primary); }
+    .toggle-switch.off { background: var(--text-light); }
+    .toggle-switch.on::after  { transform: translateX(20px); }
+    .toggle-switch.off::after { transform: translateX(0); }
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .badge-role-admin    { background:#dbeafe; color:#1d4ed8; }
+    .badge-role-organizer{ background:#fce7f3; color:#be185d; }
+    .badge-role-attendee { background:#dcfce7; color:#15803d; }
+    .badge-role-supervisor{ background:#fef9c3; color:#a16207; }
+    body.dark .badge-role-admin     { background:rgba(37,99,235,.2);  color:#93c5fd; }
+    body.dark .badge-role-organizer { background:rgba(190,24,93,.22); color:#f9a8d4; }
+    body.dark .badge-role-attendee  { background:rgba(21,128,61,.22); color:#86efac; }
+    body.dark .badge-role-supervisor{ background:rgba(161,98,7,.25);  color:#fcd34d; }
+    @media (max-width:768px) {
+      .health-grid { grid-template-columns: 1fr; }
+      .financial-cards { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Navbar ── -->
+  <nav class="navbar">
+    <a class="nav-logo" href="/pages/1_index.html">
+      <span class="logo-top">Planning</span>
+      <span class="logo-bottom">Center</span>
+    </a>
+    <button class="hamburger" id="hamburger">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="nav-links" id="navLinks">
+      <button class="btn btn-outline"
+        onclick="location.href='/pages/1_index.html'">
+        <i class="ri-home-line"></i> Home
+      </button>
+      <button class="btn btn-primary">
+        <i class="ri-dashboard-line"></i> Dashboard
+      </button>
+      <button class="btn btn-outline" onclick="logout()">
+        <i class="ri-logout-box-r-line"></i> Logout
+      </button>
+    </div>
+  </nav>
+
+  <div class="dashboard-page">
+
+    <!-- Header -->
+    <div class="dashboard-header">
+      <div>
+        <h1>System Administrator Dashboard</h1>
+        <p>Complete platform control and monitoring</p>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <span id="superAdminName"
+          style="font-size:13px;color:var(--text-medium)"></span>
+        <button class="btn btn-outline btn-sm"
+          onclick="alert('System report exported!')">
+          <i class="ri-download-line"></i> Export Report
+        </button>
+      </div>
+    </div>
+
+    <div class="dashboard-body">
+
+      <!-- ── Tabs ── -->
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="tab-overview"
+          onclick="switchTab('tab-overview')">
+          <i class="ri-bar-chart-line"></i> Overview
+        </button>
+        <button class="tab-btn" data-tab="tab-users"
+          onclick="switchTab('tab-users')">
+          <i class="ri-group-line"></i> All Users
+        </button>
+        <button class="tab-btn" data-tab="tab-events"
+          onclick="switchTab('tab-events')">
+          <i class="ri-calendar-event-line"></i> All Events
+        </button>
+        <button class="tab-btn" data-tab="tab-financial"
+          onclick="switchTab('tab-financial')">
+          <i class="ri-money-dollar-circle-line"></i> Financial
+        </button>
+        <button class="tab-btn" data-tab="tab-settings"
+          onclick="switchTab('tab-settings')">
+          <i class="ri-settings-3-line"></i> System Settings
+        </button>
+        <button class="tab-btn" data-tab="tab-audit"
+          onclick="switchTab('tab-audit')">
+          <i class="ri-file-text-line"></i> Audit Logs
+        </button>
+        <button class="tab-btn" data-tab="tab-health"
+          onclick="switchTab('tab-health')">
+          <i class="ri-computer-line"></i> System Health
+        </button>
+      </div>
+
+      <!-- ════════ TAB 1: OVERVIEW ════════ -->
+      <div class="tab-content active" id="tab-overview">
+
+        <!-- Stat Cards -->
+        <div class="stats-cards">
+          <div class="stat-card">
+            <div class="stat-card-info">
+              <div class="label">Total Users</div>
+              <div class="value">15,890</div>
+              <div style="font-size:12px;color:var(--success)">
+                +8% from last month
+              </div>
+            </div>
+            <div class="stat-card-icon">
+              <i class="ri-group-line"></i>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-info">
+              <div class="label">Total Events</div>
+              <div class="value">200</div>
+              <div style="font-size:12px;color:var(--success)">
+                +12% from last month
+              </div>
+            </div>
+            <div class="stat-card-icon">
+              <i class="ri-calendar-event-line"></i>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-info">
+              <div class="label">Total Revenue</div>
+              <div class="value">$1,000,000</div>
+              <div style="font-size:12px;color:var(--success)">
+                +20% from last month
+              </div>
+            </div>
+            <div class="stat-card-icon">
+              <i class="ri-money-dollar-circle-line"></i>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-info">
+              <div class="label">Registrations</div>
+              <div class="value">9,430</div>
+              <div style="font-size:12px;color:var(--success)">
+                +15% from last month
+              </div>
+            </div>
+            <div class="stat-card-icon">
+              <i class="ri-ticket-2-line"></i>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts-row">
+          <div class="chart-card">
+            <h3>Monthly Revenue</h3>
+            <canvas id="revenueChart" height="180"></canvas>
+          </div>
+          <div class="chart-card">
+            <h3>Events by Category</h3>
+            <canvas id="categoryChart" height="180"></canvas>
+          </div>
+        </div>
+
+        <!-- Recent Registrations -->
+        <div class="card" style="padding:20px">
+          <div class="section-header">
+            <div class="section-title" style="margin:0">
+              Recent Registrations
+            </div>
+            <div class="table-search" style="margin:0;max-width:260px">
+              <i class="ri-search-line"></i>
+              <input type="text"
+                placeholder="Search..."
+                oninput="filterTable('overviewTable', this.value)" />
+            </div>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="data-table" id="overviewTable">
+              <thead>
+                <tr>
+                  <th>Attendee</th>
+                  <th>Event</th>
+                  <th>Date</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:10px">
+                      <div class="avatar-circle badge-role-admin">M</div>
+                      Muon Sokea
+                    </div>
+                  </td>
+                  <td>Tech Innovation Summit 2026</td>
+                  <td>March 13, 2026</td>
+                  <td>$300</td>
+                  <td><span class="badge badge-confirmed">
+                    <i class="ri-checkbox-circle-line"></i> Confirmed
+                  </span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:10px">
+                      <div class="avatar-circle badge-role-organizer">P</div>
+                      Proeung Sivly
+                    </div>
+                  </td>
+                  <td>Business Leadership Conference</td>
+                  <td>March 13, 2026</td>
+                  <td>$450</td>
+                  <td><span class="badge badge-pending">
+                    <i class="ri-time-line"></i> Pending
+                  </span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:10px">
+                      <div class="avatar-circle badge-role-attendee">S</div>
+                      San Sotheayuth
+                    </div>
+                  </td>
+                  <td>Digital Marketing Workshop</td>
+                  <td>March 13, 2026</td>
+                  <td>$300</td>
+                  <td><span class="badge badge-confirmed">
+                    <i class="ri-checkbox-circle-line"></i> Confirmed
+                  </span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:10px">
+                      <div class="avatar-circle badge-role-supervisor">L</div>
+                      Lang Socheat
+                    </div>
+                  </td>
+                  <td>Networking & Innovation Forum</td>
+                  <td>March 13, 2026</td>
+                  <td>$300</td>
+                  <td><span class="badge badge-cancelled">
+                    <i class="ri-close-circle-line"></i> Cancelled
+                  </span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ════════ TAB 2: ALL USERS ════════ -->
+      <div class="tab-content" id="tab-users">
+
+        <div class="section-header">
+          <div class="section-title" style="margin:0">
+            All Users &nbsp;<span style="font-size:13px;color:var(--text-light);font-weight:400"><span id="superUserCount">0</span> total</span>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="openModal('createAdminModal')">
+            <i class="ri-user-add-line"></i> Add User
+          </button>
+        </div>
+
+        <!-- Role filter pills -->
+        <div class="role-filter">
+          <button class="role-pill active"
+            onclick="filterByRole('all', this)">
+            All Users
+          </button>
+          <button class="role-pill"
+            onclick="filterByRole('Supervisor', this)">
+            Super Admin
+          </button>
+          <button class="role-pill"
+            onclick="filterByRole('Admin', this)">
+            Admin
+          </button>
+          <button class="role-pill"
+            onclick="filterByRole('Organizer', this)">
+            Organizer
+          </button>
+          <button class="role-pill"
+            onclick="filterByRole('Attendee', this)">
+            Attendee
+          </button>
+        </div>
+
+        <!-- Search -->
+        <div class="table-search">
+          <i class="ri-search-line"></i>
+          <input type="text" id="saUserSearch" placeholder="Search users..."
+            oninput="renderSuperUsers()" />
+        </div>
+
+        <div style="overflow-x:auto">
+          <table class="data-table" id="usersTable">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Joined</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="usersTableBody"><!-- rendered by renderSuperUsers() --></tbody>
+          </table>
+        </div>
+
+      </div>
+
+      <!-- ════════ TAB 3: ALL EVENTS ════════ -->
+      <div class="tab-content" id="tab-events">
+
+        <div class="section-header">
+          <div class="section-title" style="margin:0">All Events</div>
+          <div style="display:flex;gap:10px">
+            <div class="table-search" style="margin:0">
+              <i class="ri-search-line"></i>
+              <input type="text" placeholder="Search events..."
+                oninput="filterTable('eventsTable', this.value)" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Status filter -->
+        <div class="role-filter">
+          <button class="role-pill active"
+            onclick="filterEventStatus('all', this)">
+            All Events
+          </button>
+          <button class="role-pill"
+            onclick="filterEventStatus('Available', this)">
+            Available
+          </button>
+          <button class="role-pill"
+            onclick="filterEventStatus('Full', this)">
+            Full
+          </button>
+        </div>
+
+        <div style="overflow-x:auto">
+          <table class="data-table" id="eventsTable">
+            <thead>
+              <tr>
+                <th>Event Title</th>
+                <th>Organizer</th>
+                <th>Date</th>
+                <th>Category</th>
+                <th>Registered</th>
+                <th>Revenue</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr data-status="Available">
+                <td>Tech Innovation Summit 2026</td>
+                <td>Proeung Sivly</td>
+                <td>April 30, 2026</td>
+                <td>Technology</td>
+                <td>1000 / 2300</td>
+                <td style="color:var(--success);font-weight:600">
+                  $250,000
+                </td>
+                <td>
+                  <span class="badge badge-available">Available</span>
+                </td>
+                <td>
+                  <div class="action-btns">
+                    <button class="btn btn-outline btn-sm"
+                      onclick="alert('View event details')">
+                      <i class="ri-eye-line"></i>
+                    </button>
+                    <button class="btn btn-outline btn-sm"
+                      onclick="alert('Edit event')">
+                      <i class="ri-edit-line"></i>
+                    </button>
+                    <button class="btn btn-danger btn-sm"
+                      onclick="confirmDelete('Tech Innovation Summit')">
+                      <i class="ri-delete-bin-line"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr data-status="Full">
+                <td>Pre-Event Planning Workshop</td>
+                <td>Proeung Sivly</td>
+                <td>March 20, 2026</td>
+                <td>Workshop</td>
+                <td>1250 / 1250</td>
+                <td style="color:var(--success);font-weight:600">
+                  $375,000
+                </td>
+                <td>
+                  <span class="badge badge-full">Full</span>
+                </td>
+                <td>
+                  <div class="action-btns">
+                    <button class="btn btn-outline btn-sm"
+                      onclick="alert('View event details')">
+                      <i class="ri-eye-line"></i>
+                    </button>
+                    <button class="btn btn-outline btn-sm"
+                      onclick="alert('Edit event')">
+                      <i class="ri-edit-line"></i>
+                    </button>
+                    <button class="btn btn-danger btn-sm"
+                      onclick="confirmDelete('Pre-Event Planning')">
+                      <i class="ri-delete-bin-line"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr data-status="Available">
+                <td>Business Leadership Conference</td>
+                <td>Proeung Sivly</td>
+                <td>March 20, 2026</td>
+                <td>Business</td>
+                <td>2500 / 3000</td>
+                <td style="color:var(--success);font-weight:600">
+                  $1,125,000
+                </td>
+                <td>
+                  <span class="badge badge-available">Available</span>
+                </td>
+                <td>
+                  <div class="action-btns">
+                    <button class="btn btn-outline btn-sm"
+                      onclick="alert('View event details')">
+                      <i class="ri-eye-line"></i>
+                    </button>
+                    <button class="btn btn-outline btn-sm"
+                      onclick="alert('Edit event')">
+                      <i class="ri-edit-line"></i>
+                    </button>
+                    <button class="btn btn-danger btn-sm"
+                      onclick="confirmDelete('Business Leadership')">
+                      <i class="ri-delete-bin-line"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr data-status="Available">
+                <td>Sport Event 2026</td>
+                <td>Proeung Sivly</td>
+                <td>March 20, 2026</td>
+                <td>Sports</td>
+                <td>1250 / 2000</td>
+                <td style="color:var(--success);font-weight:600">
+                  $375,000
+                </td>
+                <td>
+                  <span class="badge badge-available">Available</span>
+                </td>
+                <td>
+                  <div class="action-btns">
+                    <button class="btn btn-outline btn-sm"
+                      onclick="alert('View event details')">
+                      <i class="ri-eye-line"></i>
+                    </button>
+                    <button class="btn btn-outline btn-sm"
+                      onclick="alert('Edit event')">
+                      <i class="ri-edit-line"></i>
+                    </button>
+                    <button class="btn btn-danger btn-sm"
+                      onclick="confirmDelete('Sport Event 2026')">
+                      <i class="ri-delete-bin-line"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+      <!-- ════════ TAB 4: FINANCIAL REPORTS ════════ -->
+      <div class="tab-content" id="tab-financial">
+
+        <div class="section-header">
+          <div class="section-title" style="margin:0">
+            Financial Reports
+          </div>
+          <button class="btn btn-outline btn-sm"
+            onclick="alert('Exporting financial report...')">
+            <i class="ri-file-excel-line"></i> Export CSV
+          </button>
+        </div>
+
+        <!-- Financial Summary Cards -->
+        <div class="financial-cards">
+          <div class="financial-card">
+            <div class="f-label">Total Revenue</div>
+            <div class="f-value">$1,000,000</div>
+            <div class="f-trend">
+              <i class="ri-arrow-up-line"></i> +20% vs last month
+            </div>
+          </div>
+          <div class="financial-card">
+            <div class="f-label">This Month</div>
+            <div class="f-value">$72,000</div>
+            <div class="f-trend">
+              <i class="ri-arrow-up-line"></i> +15% vs last month
+            </div>
+          </div>
+          <div class="financial-card">
+            <div class="f-label">Total Tickets Sold</div>
+            <div class="f-value">9,430</div>
+            <div class="f-trend">
+              <i class="ri-arrow-up-line"></i> +12% vs last month
+            </div>
+          </div>
+          <div class="financial-card">
+            <div class="f-label">Avg. Ticket Price</div>
+            <div class="f-value">$106</div>
+            <div class="f-trend">
+              <i class="ri-arrow-up-line"></i> +5% vs last month
+            </div>
+          </div>
+          <div class="financial-card">
+            <div class="f-label">Refunds Processed</div>
+            <div class="f-value">$12,400</div>
+            <div style="font-size:12px;color:var(--danger)">
+              <i class="ri-arrow-down-line"></i> 124 refunds
+            </div>
+          </div>
+          <div class="financial-card">
+            <div class="f-label">Net Revenue</div>
+            <div class="f-value">$987,600</div>
+            <div class="f-trend">
+              <i class="ri-arrow-up-line"></i> After refunds
+            </div>
+          </div>
+        </div>
+
+        <!-- Revenue chart -->
+        <div class="chart-card" style="margin-bottom:20px">
+          <h3>Monthly Revenue Breakdown</h3>
+          <canvas id="financialChart" height="120"></canvas>
+        </div>
+
+        <!-- Revenue by event table -->
+        <div class="section-title">Revenue by Event</div>
+        <div style="overflow-x:auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Event</th>
+                <th>Category</th>
+                <th>Tickets Sold</th>
+                <th>Ticket Price</th>
+                <th>Gross Revenue</th>
+                <th>Refunds</th>
+                <th>Net Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Tech Innovation Summit 2026</td>
+                <td>Technology</td>
+                <td>1,000</td>
+                <td>$250</td>
+                <td>$250,000</td>
+                <td style="color:var(--danger)">-$2,500</td>
+                <td style="color:var(--success);font-weight:600">
+                  $247,500
+                </td>
+              </tr>
+              <tr>
+                <td>Pre-Event Planning Workshop</td>
+                <td>Workshop</td>
+                <td>1,250</td>
+                <td>$300</td>
+                <td>$375,000</td>
+                <td style="color:var(--danger)">-$3,000</td>
+                <td style="color:var(--success);font-weight:600">
+                  $372,000
+                </td>
+              </tr>
+              <tr>
+                <td>Business Leadership Conference</td>
+                <td>Business</td>
+                <td>2,500</td>
+                <td>$450</td>
+                <td>$1,125,000</td>
+                <td style="color:var(--danger)">-$4,500</td>
+                <td style="color:var(--success);font-weight:600">
+                  $1,120,500
+                </td>
+              </tr>
+              <tr>
+                <td>Music Festival 2026</td>
+                <td>Entertainment</td>
+                <td>5,230</td>
+                <td>$100</td>
+                <td>$523,000</td>
+                <td style="color:var(--danger)">-$2,400</td>
+                <td style="color:var(--success);font-weight:600">
+                  $520,600
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+      <!-- ════════ TAB 5: SYSTEM SETTINGS ════════ -->
+      <div class="tab-content" id="tab-settings">
+
+        <div class="section-title">System Configuration</div>
+
+        <!-- Notification Settings -->
+        <div class="card" style="margin-bottom:16px">
+          <div style="font-size:15px;font-weight:600;
+            margin-bottom:14px;display:flex;
+            align-items:center;gap:8px">
+            <i class="ri-notification-3-line"
+              style="color:var(--primary)"></i>
+            Notification Settings
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div class="t-label">Email Notifications</div>
+              <div class="t-sub">
+                Send email notifications to all users
+              </div>
+            </div>
+            <button class="toggle-switch on"
+              onclick="this.classList.toggle('on');
+                       this.classList.toggle('off')"></button>
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div class="t-label">SMS Notifications</div>
+              <div class="t-sub">
+                Send SMS alerts to registered users
+              </div>
+            </div>
+            <button class="toggle-switch on"
+              onclick="this.classList.toggle('on');
+                       this.classList.toggle('off')"></button>
+          </div>
+          <div class="toggle-row" style="border:none">
+            <div>
+              <div class="t-label">Push Notifications</div>
+              <div class="t-sub">
+                Send browser push notifications
+              </div>
+            </div>
+            <button class="toggle-switch off"
+              onclick="this.classList.toggle('on');
+                       this.classList.toggle('off')"></button>
+          </div>
+        </div>
+
+        <!-- Database Settings -->
+        <div class="card" style="margin-bottom:16px">
+          <div style="font-size:15px;font-weight:600;
+            margin-bottom:14px;display:flex;
+            align-items:center;gap:8px">
+            <i class="ri-database-2-line"
+              style="color:var(--success)"></i>
+            Database Settings
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div class="t-label">Automatic Backups</div>
+              <div class="t-sub">
+                Daily automated database backups at 2:00 AM
+              </div>
+            </div>
+            <button class="toggle-switch on"
+              onclick="this.classList.toggle('on');
+                       this.classList.toggle('off')"></button>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:10px">
+            <button class="btn btn-success btn-sm"
+              onclick="alert('Downloading latest backup...')">
+              <i class="ri-download-line"></i>
+              Download Latest Backup
+            </button>
+            <button class="btn btn-outline btn-sm"
+              onclick="alert('Manual backup started!')">
+              <i class="ri-refresh-line"></i>
+              Run Backup Now
+            </button>
+          </div>
+        </div>
+
+        <!-- Security Settings -->
+        <div class="card" style="margin-bottom:16px">
+          <div style="font-size:15px;font-weight:600;
+            margin-bottom:14px;display:flex;
+            align-items:center;gap:8px">
+            <i class="ri-shield-check-line"
+              style="color:var(--danger)"></i>
+            Security Settings
+          </div>
+          <div class="toggle-row">
+            <div>
+              <div class="t-label">
+                Two-Factor Authentication
+              </div>
+              <div class="t-sub">
+                Require 2FA for all administrators
+              </div>
+            </div>
+            <button class="toggle-switch on"
+              onclick="this.classList.toggle('on');
+                       this.classList.toggle('off')"></button>
+          </div>
+          <div class="toggle-row" style="border:none">
+            <div>
+              <div class="t-label">Force Password Reset</div>
+              <div class="t-sub">
+                Require password change every 90 days
+              </div>
+            </div>
+            <button class="toggle-switch off"
+              onclick="this.classList.toggle('on');
+                       this.classList.toggle('off')"></button>
+          </div>
+          <div style="display:flex;gap:32px;
+            margin-top:16px;font-size:14px;
+            flex-wrap:wrap">
+            <div>
+              <div style="color:var(--text-light);
+                font-size:12px">Session Timeout</div>
+              <select style="margin-top:4px;padding:6px 10px;
+                border:1px solid var(--border);
+                border-radius:var(--border-radius);
+                font-family:var(--font);font-size:13px">
+                <option>30 minutes</option>
+                <option>1 hour</option>
+                <option>4 hours</option>
+                <option>8 hours</option>
+              </select>
+            </div>
+            <div>
+              <div style="color:var(--text-light);
+                font-size:12px">Password Complexity</div>
+              <select style="margin-top:4px;padding:6px 10px;
+                border:1px solid var(--border);
+                border-radius:var(--border-radius);
+                font-family:var(--font);font-size:13px">
+                <option>High</option>
+                <option>Medium</option>
+                <option>Low</option>
+              </select>
+            </div>
+            <div>
+              <div style="color:var(--text-light);
+                font-size:12px">Max Login Attempts</div>
+              <select style="margin-top:4px;padding:6px 10px;
+                border:1px solid var(--border);
+                border-radius:var(--border-radius);
+                font-family:var(--font);font-size:13px">
+                <option>3 attempts</option>
+                <option>5 attempts</option>
+                <option>10 attempts</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-full"
+          onclick="alert('All settings saved successfully!')">
+          <i class="ri-save-line"></i> Save All Settings
+        </button>
+
+      </div>
+
+      <!-- ════════ TAB 6: AUDIT LOGS ════════ -->
+      <div class="tab-content" id="tab-audit">
+
+        <div class="section-header">
+          <div class="section-title" style="margin:0">Audit Logs</div>
+          <div style="display:flex;gap:10px">
+            <div class="table-search" style="margin:0">
+              <i class="ri-search-line"></i>
+              <input type="text" placeholder="Search logs..."
+                oninput="filterTable('auditTable', this.value)"/>
+            </div>
+            <button class="btn btn-outline btn-sm"
+              onclick="alert('Logs exported!')">
+              <i class="ri-download-line"></i> Export
+            </button>
+          </div>
+        </div>
+
+        <div style="overflow-x:auto">
+          <table class="data-table" id="auditTable">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>User</th>
+                <th>Role</th>
+                <th>Action</th>
+                <th>IP Address</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>2026-03-27 08:42:11</td>
+                <td>Muon Sokea</td>
+                <td><span class="badge badge-role-supervisor">
+                  Super Admin
+                </span></td>
+                <td>System login</td>
+                <td>192.168.1.1</td>
+                <td><span class="badge badge-confirmed">
+                  Success
+                </span></td>
+              </tr>
+              <tr>
+                <td>2026-03-27 09:10:33</td>
+                <td>San Sotheayuth</td>
+                <td><span class="badge badge-role-admin">
+                  Admin
+                </span></td>
+                <td>Viewed registrations</td>
+                <td>192.168.1.2</td>
+                <td><span class="badge badge-confirmed">
+                  Success
+                </span></td>
+              </tr>
+              <tr>
+                <td>2026-03-27 09:35:02</td>
+                <td>Unknown</td>
+                <td>—</td>
+                <td>Failed login attempt</td>
+                <td>203.45.67.89</td>
+                <td><span class="badge badge-full">Failed</span></td>
+              </tr>
+              <tr>
+                <td>2026-03-27 10:00:15</td>
+                <td>Proeung Sivly</td>
+                <td><span class="badge badge-role-organizer">
+                  Organizer
+                </span></td>
+                <td>Created new event</td>
+                <td>192.168.1.3</td>
+                <td><span class="badge badge-confirmed">
+                  Success
+                </span></td>
+              </tr>
+              <tr>
+                <td>2026-03-27 10:22:44</td>
+                <td>Lang Socheat</td>
+                <td><span class="badge badge-role-attendee">
+                  Attendee
+                </span></td>
+                <td>Registered for event</td>
+                <td>192.168.1.4</td>
+                <td><span class="badge badge-confirmed">
+                  Success
+                </span></td>
+              </tr>
+              <tr>
+                <td>2026-03-27 11:05:30</td>
+                <td>Muon Sokea</td>
+                <td><span class="badge badge-role-supervisor">
+                  Super Admin
+                </span></td>
+                <td>Updated system settings</td>
+                <td>192.168.1.1</td>
+                <td><span class="badge badge-confirmed">
+                  Success
+                </span></td>
+              </tr>
+              <tr>
+                <td>2026-03-27 11:30:00</td>
+                <td>San Sotheayuth</td>
+                <td><span class="badge badge-role-admin">
+                  Admin
+                </span></td>
+                <td>Exported financial report</td>
+                <td>192.168.1.2</td>
+                <td><span class="badge badge-confirmed">
+                  Success
+                </span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+      <!-- ════════ TAB 7: SYSTEM HEALTH ════════ -->
+      <div class="tab-content" id="tab-health">
+
+        <div class="section-header">
+          <div class="section-title" style="margin:0">
+            System Health Monitoring
+          </div>
+          <button class="btn btn-outline btn-sm"
+            onclick="refreshHealth()">
+            <i class="ri-refresh-line"></i> Refresh
+          </button>
+        </div>
+
+        <!-- Health bars -->
+        <div class="health-cards" style="margin-bottom:20px">
+          <div class="health-card">
+            <div class="health-label">CPU Usage</div>
+            <div class="health-value"
+              style="color:var(--danger)">72%</div>
+            <div class="health-bar">
+              <div class="health-fill"
+                style="width:72%;background:var(--danger)"></div>
+            </div>
+          </div>
+          <div class="health-card">
+            <div class="health-label">Memory Usage</div>
+            <div class="health-value"
+              style="color:var(--warning)">68%</div>
+            <div class="health-bar">
+              <div class="health-fill"
+                style="width:68%;background:var(--warning)"></div>
+            </div>
+          </div>
+          <div class="health-card">
+            <div class="health-label">Disk Usage</div>
+            <div class="health-value"
+              style="color:var(--success)">42%</div>
+            <div class="health-bar">
+              <div class="health-fill"
+                style="width:42%;background:var(--success)"></div>
+            </div>
+          </div>
+          <div class="health-card">
+            <div class="health-label">Network Load</div>
+            <div class="health-value"
+              style="color:var(--info)">35%</div>
+            <div class="health-bar">
+              <div class="health-fill"
+                style="width:35%;background:var(--info)"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 24hr chart -->
+        <div class="chart-card" style="margin-bottom:20px">
+          <h3>24-Hour Resource Monitoring</h3>
+          <canvas id="healthChart" height="120"></canvas>
+        </div>
+
+        <!-- Service status + backup -->
+        <div class="health-grid">
+          <div class="card">
+            <div style="font-size:15px;font-weight:600;
+              margin-bottom:12px">Service Status</div>
+            <div class="service-row">
+              <span>Web Server</span>
+              <span class="service-ok">
+                <i class="ri-checkbox-circle-line"></i> Operational
+              </span>
+            </div>
+            <div class="service-row">
+              <span>Database Server</span>
+              <span class="service-ok">
+                <i class="ri-checkbox-circle-line"></i> Operational
+              </span>
+            </div>
+            <div class="service-row">
+              <span>Email Service</span>
+              <span class="service-ok">
+                <i class="ri-checkbox-circle-line"></i> Operational
+              </span>
+            </div>
+            <div class="service-row">
+              <span>SMS Service</span>
+              <span class="service-ok">
+                <i class="ri-checkbox-circle-line"></i> Operational
+              </span>
+            </div>
+            <div class="service-row">
+              <span>Payment Gateway</span>
+              <span class="service-ok">
+                <i class="ri-checkbox-circle-line"></i> Operational
+              </span>
+            </div>
+            <div class="service-row" style="border:none">
+              <span>CDN Service</span>
+              <span class="service-ok">
+                <i class="ri-checkbox-circle-line"></i> Operational
+              </span>
+            </div>
+          </div>
+          <div class="card">
+            <div style="font-size:15px;font-weight:600;
+              margin-bottom:12px">Last Backup</div>
+            <div class="service-row">
+              <span>Backup Date</span>
+              <span>2026-03-27 02:00</span>
+            </div>
+            <div class="service-row">
+              <span>Backup Size</span>
+              <span>24.3 GB</span>
+            </div>
+            <div class="service-row">
+              <span>Status</span>
+              <span class="service-ok">
+                <i class="ri-checkbox-circle-line"></i> Successful
+              </span>
+            </div>
+            <div class="service-row">
+              <span>Next Scheduled</span>
+              <span>2026-03-28 02:00</span>
+            </div>
+            <div class="service-row">
+              <span>Total Backups</span>
+              <span>86 backups</span>
+            </div>
+            <div class="service-row" style="border:none">
+              <span>Retention Period</span>
+              <span>30 days</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Create User Modal -->
+  <div class="modal-overlay" id="createAdminModal">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div class="modal-icon info"><i class="ri-user-add-line"></i></div>
+        <h3>Add New User</h3>
+        <button class="m-close" onclick="closeModal('createAdminModal')">&times;</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label class="field-label">First Name *</label>
+          <input class="field-select" type="text" id="saNewFirstName" placeholder="First name" />
+        </div>
+        <div>
+          <label class="field-label">Last Name *</label>
+          <input class="field-select" type="text" id="saNewLastName" placeholder="Last name" />
+        </div>
+      </div>
+      <label class="field-label">Email *</label>
+      <input class="field-select" type="email" id="saNewEmail" placeholder="user@example.com" />
+      <label class="field-label">Password *</label>
+      <input class="field-select" type="password" id="saNewPassword" placeholder="Minimum 6 characters" />
+      <label class="field-label">Role</label>
+      <select class="field-select" id="saNewRole">
+        <option value="Admin">Admin</option>
+        <option value="Organizer">Organizer</option>
+        <option value="Attendee">Attendee</option>
+        <option value="Supervisor">Super Admin</option>
+      </select>
+      <div id="saCreateError" style="font-size:13px;color:#dc2626;margin-top:8px;display:none"></div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closeModal('createAdminModal')">Cancel</button>
+        <button class="btn btn-primary" onclick="createSuperUser()">
+          <i class="ri-user-add-line"></i> Create User
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirm Modal -->
+  <div class="modal-overlay" id="saDeleteModal">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div class="modal-icon danger"><i class="ri-delete-bin-line"></i></div>
+        <h3>Delete User</h3>
+        <button class="m-close" onclick="closeModal('saDeleteModal')">&times;</button>
+      </div>
+      <p class="modal-text">Are you sure you want to delete <strong id="saDeleteName"></strong>? This cannot be undone.</p>
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closeModal('saDeleteModal')">Cancel</button>
+        <button class="btn btn-danger" onclick="confirmSuperDelete()"><i class="ri-delete-bin-line"></i> Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/assets/js/0_api.js"></script>
+  <script src="/assets/js/1_navbar.js"></script>
+  <script type="module" src="/assets/js/4_dashboard.js"></script>
+  <script>
+
+    // ── Protect page ──
+    const BYPASS_AUTH = true;
+    if (!BYPASS_AUTH) { requireAuth(); requireRole(["Supervisor"]); }
+
+    // ── Data layer (mirrors admin dashboard) ──
+    const SA_RESERVED = [
+      { firstName:"Muon",   lastName:"Sokea",      email:"muonsokea@gmail.com",     role:"Supervisor", joined:"Jan 10, 2026" },
+      { firstName:"San",    lastName:"Sotheayuth", email:"sansotheayuth@gmail.com", role:"Admin",      joined:"Jan 10, 2026" },
+      { firstName:"Proeung",lastName:"Sivly",      email:"proeungsivly@gmail.com",  role:"Organizer",  joined:"Jan 10, 2026" },
+      { firstName:"Lang",   lastName:"Socheat",    email:"langsocheat@gmail.com",   role:"Attendee",   joined:"Jan 10, 2026" }
+    ];
+    const OVER_KEY = "erms_admin_overrides";
+    const loadOv    = () => { try { return JSON.parse(localStorage.getItem(OVER_KEY) || "{}") || {}; } catch(e) { return {}; } };
+    const saveOv    = o  => localStorage.setItem(OVER_KEY, JSON.stringify(o));
+    const loadAtts  = () => { try { const a = JSON.parse(localStorage.getItem("erms_attendees") || "[]"); return Array.isArray(a) ? a : []; } catch(e) { return []; } };
+    const saveAtts  = a  => localStorage.setItem("erms_attendees", JSON.stringify(a));
+
+    function getSuperUsers() {
+      const ov = loadOv();
+      const reserved = SA_RESERVED.map(u => {
+        const o = ov[u.email] || {};
+        return { ...u, role: o.role || u.role, status: o.status || "Active", deleted: !!o.deleted, src:"reserved" };
+      }).filter(u => !u.deleted);
+      const attendees = loadAtts().map(u => ({
+        firstName: u.firstName||"", lastName: u.lastName||"", email: u.email||"",
+        role: u.role||"Attendee", status: u.status||"Active",
+        joined: u.joined||(Number(u.id)>1e12 ? new Date(Number(u.id)).toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"}) : "—"),
+        src:"attendee"
+      }));
+      return [...reserved, ...attendees];
+    }
+
+    const ROLE_BADGE = { Supervisor:"badge-role-supervisor", Admin:"badge-role-admin", Organizer:"badge-role-organizer", Attendee:"badge-role-attendee" };
+    const ROLE_LABEL = { Supervisor:"Super Admin", Admin:"Admin", Organizer:"Organizer", Attendee:"Attendee" };
+    const AVATAR_CLR = { Supervisor:["#fef9c3","#a16207"], Admin:["#dbeafe","#1d4ed8"], Organizer:["#fce7f3","#be185d"], Attendee:["#dcfce7","#15803d"] };
+    const saFull     = u => `${u.firstName} ${u.lastName}`.trim() || u.email;
+    const saInit     = u => (u.firstName || u.email || "?").charAt(0).toUpperCase();
+    function escH(s) { return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+    let saRoleFilter = "all";
+    let saDeleteTarget = null;
+
+    function renderSuperUsers() {
+      const body = document.getElementById("usersTableBody");
+      const q    = (document.getElementById("saUserSearch") || {value:""}).value.toLowerCase();
+      const all  = getSuperUsers();
+      const me   = (typeof getCurrentUser === "function") ? getCurrentUser() : null;
+      const myEmail = me ? (me.email || "").toLowerCase() : "";
+
+      const filtered = all.filter(u => {
+        const roleOk = saRoleFilter === "all" || u.role === saRoleFilter;
+        const text   = (saFull(u) + " " + u.email).toLowerCase();
+        return roleOk && text.includes(q);
+      });
+
+      const countEl = document.getElementById("superUserCount");
+      if (countEl) countEl.textContent = all.length;
+
+      if (!filtered.length) {
+        body.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:26px;color:var(--text-light)">No users match this filter.</td></tr>`;
+        return;
+      }
+
+      body.innerHTML = filtered.map(u => {
+        const [bg, fg] = AVATAR_CLR[u.role] || ["#e2e8f0","#475569"];
+        const isSelf   = u.email.toLowerCase() === myEmail;
+        const isSA     = u.role === "Supervisor";
+        const statusBadge = u.status === "Suspended"
+          ? `<span class="badge badge-cancelled"><i class="ri-forbid-line"></i> Suspended</span>`
+          : `<span class="badge badge-confirmed"><i class="ri-checkbox-circle-line"></i> Active</span>`;
+        const suspendIcon = u.status === "Suspended" ? "ri-check-line" : "ri-forbid-line";
+        const actions = (isSelf || isSA)
+          ? `<span style="font-size:11px;color:var(--text-light)">${isSA && isSelf ? "You · Protected" : isSelf ? "You" : "Protected"}</span>`
+          : `<div class="action-btns">
+               <button class="btn btn-outline btn-sm" title="${u.status === 'Suspended' ? 'Unsuspend' : 'Suspend'}" onclick="saToggleSuspend('${u.email}')"><i class="${suspendIcon}"></i></button>
+               <button class="btn btn-danger btn-sm" title="Delete" onclick="openSaDelete('${u.email}')"><i class="ri-delete-bin-line"></i></button>
+             </div>`;
+        return `<tr data-role="${u.role}" class="${u.status==='Suspended'?'muted-row':''}">
+          <td><div style="display:flex;align-items:center;gap:10px">
+            <div class="avatar-circle" style="background:${bg};color:${fg}">${saInit(u)}</div>
+            ${escH(saFull(u))}
+          </div></td>
+          <td>${escH(u.email)}</td>
+          <td><span class="badge ${ROLE_BADGE[u.role]||""}">${ROLE_LABEL[u.role]||u.role}</span></td>
+          <td>${statusBadge}</td>
+          <td>${escH(u.joined)}</td>
+          <td>${actions}</td>
+        </tr>`;
+      }).join("");
+    }
+
+    function saToggleSuspend(email) {
+      const u = getSuperUsers().find(u => u.email.toLowerCase() === email.toLowerCase());
+      if (!u) return;
+      const next = u.status === "Suspended" ? "Active" : "Suspended";
+      if (u.src === "attendee") {
+        const list = loadAtts(); const i = list.findIndex(a => (a.email||"").toLowerCase() === email.toLowerCase());
+        if (i !== -1) { list[i].status = next; saveAtts(list); }
+      } else {
+        const ov = loadOv(); ov[u.email] = { ...(ov[u.email]||{}), status: next }; saveOv(ov);
+      }
+      renderSuperUsers();
+    }
+
+    function openSaDelete(email) {
+      const u = getSuperUsers().find(u => u.email.toLowerCase() === email.toLowerCase());
+      if (!u) return;
+      saDeleteTarget = email;
+      document.getElementById("saDeleteName").textContent = saFull(u);
+      openModal("saDeleteModal");
+    }
+
+    function confirmSuperDelete() {
+      if (!saDeleteTarget) { closeModal("saDeleteModal"); return; }
+      const u = getSuperUsers().find(u => u.email.toLowerCase() === saDeleteTarget.toLowerCase());
+      if (u) {
+        if (u.src === "attendee") {
+          saveAtts(loadAtts().filter(a => (a.email||"").toLowerCase() !== saDeleteTarget.toLowerCase()));
+        } else {
+          const ov = loadOv(); ov[u.email] = { ...(ov[u.email]||{}), deleted: true }; saveOv(ov);
+        }
+      }
+      closeModal("saDeleteModal");
+      renderSuperUsers();
+    }
+
+    function createSuperUser() {
+      const err = document.getElementById("saCreateError");
+      err.style.display = "none";
+      const firstName = document.getElementById("saNewFirstName").value.trim();
+      const lastName  = document.getElementById("saNewLastName").value.trim();
+      const email     = document.getElementById("saNewEmail").value.trim().toLowerCase();
+      const password  = document.getElementById("saNewPassword").value;
+      const role      = document.getElementById("saNewRole").value;
+      if (!firstName || !lastName || !email || !password) { err.textContent = "Please fill in all required fields."; err.style.display="block"; return; }
+      if (password.length < 6) { err.textContent = "Password must be at least 6 characters."; err.style.display="block"; return; }
+      if (!/\S+@\S+\.\S+/.test(email)) { err.textContent = "Please enter a valid email address."; err.style.display="block"; return; }
+      if (getSuperUsers().some(u => u.email.toLowerCase() === email)) { err.textContent = "An account with this email already exists."; err.style.display="block"; return; }
+      const list = loadAtts();
+      list.push({ id: Date.now(), firstName, lastName, email, role, status:"Active", joined: new Date().toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"}) });
+      saveAtts(list);
+      ["saNewFirstName","saNewLastName","saNewEmail","saNewPassword"].forEach(id => document.getElementById(id).value = "");
+      document.getElementById("saNewRole").value = "Admin";
+      closeModal("createAdminModal");
+      renderSuperUsers();
+    }
+
+    // ── Modal helpers ──
+    function openModal(id)  { document.getElementById(id).classList.add("show"); }
+    function closeModal(id) { document.getElementById(id).classList.remove("show"); }
+    document.addEventListener("DOMContentLoaded", () => {
+      document.querySelectorAll(".modal-overlay").forEach(ov => {
+        ov.addEventListener("click", e => { if (e.target === ov) ov.classList.remove("show"); });
+      });
+      document.addEventListener("keydown", e => {
+        if (e.key === "Escape") document.querySelectorAll(".modal-overlay.show").forEach(m => m.classList.remove("show"));
+      });
+    });
+
+    // ── Tab switching ──
+    function switchTab(tabId) {
+      document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.getElementById(tabId).classList.add("active");
+      document.querySelector(`[data-tab="${tabId}"]`).classList.add("active");
+    }
+
+    // ── Filter table rows by search text ──
+    function filterTable(tableId, query) {
+      document.querySelectorAll(`#${tableId} tbody tr`).forEach(row => {
+        row.style.display = row.textContent.toLowerCase().includes(query.toLowerCase()) ? "" : "none";
+      });
+    }
+
+    // ── Filter users by role ──
+    function filterByRole(role, btn) {
+      saRoleFilter = role;
+      document.querySelectorAll(".role-filter .role-pill").forEach(p => p.classList.remove("active"));
+      btn.classList.add("active");
+      renderSuperUsers();
+    }
+
+    // ── Filter events by status ──
+    function filterEventStatus(status, btn) {
+      document.querySelectorAll(".role-filter .role-pill").forEach(p => p.classList.remove("active"));
+      btn.classList.add("active");
+      document.querySelectorAll("#eventsTable tbody tr").forEach(row => {
+        row.style.display = status === "all" || row.dataset.status === status ? "" : "none";
+      });
+    }
+
+    // ── Refresh health ──
+    function refreshHealth() {
+      alert("System health data refreshed!");
+    }
+
+    // ── Charts + init ──
+    document.addEventListener("DOMContentLoaded", () => {
+      const user = (typeof getCurrentUser === "function") ? getCurrentUser() : null;
+      if (user) {
+        const el = document.getElementById("superAdminName");
+        if (el) el.textContent = "Welcome, " + user.firstName + " " + user.lastName;
+      }
+      renderSuperUsers();
+
+      // Revenue chart
+      new Chart(document.getElementById("revenueChart"), {
+        type: "line",
+        data: {
+          labels: ["Oct","Nov","Dec","Jan","Feb","Mar"],
+          datasets: [{
+            data: [45000,52000,48000,60000,55000,72000],
+            borderColor: "#4A90D9",
+            backgroundColor: "rgba(74,144,217,0.08)",
+            tension: 0.4, fill: true,
+            pointBackgroundColor: "#4A90D9",
+            pointRadius: 4,
+          }]
+        },
+        options: {
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, grid: { color: "#f0f0f0" } },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+
+      // Category chart
+      new Chart(document.getElementById("categoryChart"), {
+        type: "bar",
+        data: {
+          labels: [
+            "Technology","Business",
+            "Workshop","Entertainment","Sports"
+          ],
+          datasets: [{
+            data: [45,31,28,32,15],
+            backgroundColor: "#4A90D9",
+            borderRadius: 4,
+          }]
+        },
+        options: {
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, grid: { color: "#f0f0f0" } },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+
+      // Financial chart
+      new Chart(document.getElementById("financialChart"), {
+        type: "bar",
+        data: {
+          labels: ["Oct","Nov","Dec","Jan","Feb","Mar"],
+          datasets: [
+            {
+              label: "Revenue",
+              data: [45000,52000,48000,60000,55000,72000],
+              backgroundColor: "rgba(245,166,35,0.8)",
+              borderRadius: 4,
+            },
+            {
+              label: "Refunds",
+              data: [1200,1800,900,2100,1500,2400],
+              backgroundColor: "rgba(220,53,69,0.7)",
+              borderRadius: 4,
+            }
+          ]
+        },
+        options: {
+          plugins: {
+            legend: {
+              display: true,
+              position: "top"
+            }
+          },
+          scales: {
+            y: { beginAtZero: true, grid: { color: "#f0f0f0" } },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+
+      // Health chart
+      new Chart(document.getElementById("healthChart"), {
+        type: "line",
+        data: {
+          labels: [
+            "00:00","04:00","08:00",
+            "12:00","16:00","20:00"
+          ],
+          datasets: [
+            {
+              label: "CPU",
+              data: [60,55,50,80,75,72],
+              borderColor: "#dc3545",
+              tension: 0.4,
+              pointRadius: 3,
+              fill: false,
+            },
+            {
+              label: "Memory",
+              data: [62,60,65,75,70,68],
+              borderColor: "#4A90D9",
+              tension: 0.4,
+              pointRadius: 3,
+              fill: false,
+            },
+            {
+              label: "Disk",
+              data: [40,41,41,42,42,42],
+              borderColor: "#28a745",
+              tension: 0.4,
+              pointRadius: 3,
+              fill: false,
+            }
+          ]
+        },
+        options: {
+          plugins: {
+            legend: {
+              display: true,
+              position: "top"
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 100,
+              grid: { color: "#f0f0f0" }
+            },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+
+    });
+
+  </script>
+  <script src="/assets/js/7_cursor.js"></script>
+</body>
+</html>
