@@ -1,9 +1,11 @@
 import { createContext, useContext, useState, useCallback } from 'react';
-import { apiLogout } from '../services/api.js';
+import { useNavigate } from 'react-router-dom';
+import { apiLogout } from '../services/auth.service.js';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
+  const navigate = useNavigate();
   const [user, setUser] = useState(() => {
     try { return JSON.parse(localStorage.getItem('erms_user')); } catch { return null; }
   });
@@ -22,11 +24,21 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const logout = useCallback(async () => {
-    await apiLogout();
+  const logout = useCallback(() => {
+    // Clear React state synchronously
     setUser(null);
     setRole(null);
-  }, []);
+    // Clear localStorage — GuestRoute checks this directly, no race condition
+    try {
+      localStorage.removeItem('erms_user');
+      localStorage.removeItem('erms_role');
+      localStorage.removeItem('erms_token');
+    } catch { /* ignore */ }
+    // Fire-and-forget API call to blacklist token
+    apiLogout().catch(() => {});
+    // React Router navigate — no full page reload, no CSS overlap issues
+    navigate('/login', { replace: true });
+  }, [navigate]);
 
   return (
     <AuthContext.Provider value={{ user, role, syncSession, logout }}>

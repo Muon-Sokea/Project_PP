@@ -1,0 +1,17 @@
+import { http } from './http.js';
+
+export async function apiGetAllUsers() {
+  return http('GET', '/users');
+}
+
+export async function apiUpdateUser(userId, data) {
+  return http('PUT', `/users/${userId}`, data);
+}
+
+export async function apiCreateUser({ firstName, lastName, email, password, role = 'Attendee' }) {
+  return http('POST', '/users', { firstName, lastName, email, password, role });
+}
+
+export async function apiDeleteUser(userId) {
+  return http('DELETE', `/users/${userId}`);
+}

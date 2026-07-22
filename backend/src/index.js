@@ -8,10 +8,14 @@ const registrationRoutes  = require("./routes/registrations");
 const ticketRoutes        = require("./routes/tickets");
 const refundRoutes        = require("./routes/refunds");
 const testimonialRoutes   = require("./routes/testimonials");
+const uploadRoutes        = require("./routes/upload");
+const organizerRoutes     = require("./routes/organizer");
 const userRoutes          = require("./routes/users");
+const adminRoutes         = require("./routes/admin");
 const errorHandler        = require("./middleware/errorHandler");
 
 const app  = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 4000;
 
 const ALLOWED_ORIGINS = [
@@ -45,6 +49,12 @@ app.use("/api/tickets",       ticketRoutes);
 app.use("/api/refunds",       refundRoutes);
 app.use("/api/testimonials",  testimonialRoutes);
 app.use("/api/users",         userRoutes);
+app.use("/api/admin",         adminRoutes);
+app.use("/api/upload",        uploadRoutes);
+app.use("/api/organizer",     organizerRoutes);
+
+// Serve uploaded images statically
+app.use("/uploads", express.static("uploads"));
 
 app.use(errorHandler);
 

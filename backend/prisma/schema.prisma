@@ -57,6 +57,7 @@ model Event {
   title       String
   description String    @default("")
   date        DateTime
+  time        String    @default("")
   location    String
   capacity    Int       @default(100)
   price       Decimal   @default(0) @db.Decimal(10, 2)
@@ -71,6 +72,10 @@ model Event {
 
   tickets     Ticket[]
   testimonials Testimonial[]
+
+  @@index([organizerId, createdAt])
+  @@index([createdAt])
+  @@index([organizerId])
 }
 
 model Ticket {
@@ -88,6 +93,9 @@ model Ticket {
   eventId      Int
 
   refund       Refund?
+
+  @@index([status])
+  @@index([eventId, status])
 }
 
 model Refund {
@@ -115,4 +123,16 @@ model Testimonial {
   userId    Int
   event     Event?   @relation(fields: [eventId], references: [id])
   eventId   Int?
+}
+
+model HealthCheck {
+  id          Int      @id @default(autoincrement())
+  cpuUsed     Float    @default(0)
+  memUsed     Float    @default(0)
+  diskUsed    Float    @default(0)
+  loadAvg     Float    @default(0)
+  services    Json     @default("[]")
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
 }

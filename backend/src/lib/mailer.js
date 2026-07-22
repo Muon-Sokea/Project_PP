@@ -49,4 +49,4 @@ async function sendOtpEmail(to, otp, purpose = "verification") {
   });
 }
 
-module.exports = { sendOtpEmail };
+module.exports = { sendOtpEmail, transporter };
