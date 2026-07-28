@@ -1,45 +1,33 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiGetAllUsers, apiCreateUser, apiUpdateUser, apiDeleteUser } from '../../services/user.service.js';
-import { apiDeleteEvent, apiTogglePublish } from '../../services/event.service.js';
+import { apiGetAllEvents, apiDeleteEvent, apiTogglePublish, apiApproveEvent, apiRejectEvent } from '../../services/event.service.js';
 import { apiGetRefunds, apiUpdateRefundStatus } from '../../services/refund.service.js';
 import { apiGetTestimonials, apiDeleteTestimonial } from '../../services/testimonial.service.js';
+import { apiGetAdminStats } from '../../services/admin.service.js';
 import { useEscapeKey } from '../../hooks/useEscapeKey.js';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock.js';
-import { loadLS, saveLS } from '../../utils/storage.js';
 import { fmtDate } from '../../utils/formatDate.js';
 import DashboardNavbar from '../../components/layout/DashboardNavbar/DashboardNavbar.jsx';
 import '../../../assets/css/1_global.css';
 import '../../../assets/css/6_dashboard.css';
 import './AdminDashboard.css';
 
-const RESERVED_USERS = [
-  { firstName: 'Muon',    lastName: 'Sokea',      email: 'muonsokea@gmail.com',     role: 'Supervisor', joined: 'Jan 10, 2026' },
-  { firstName: 'San',     lastName: 'Sotheayuth', email: 'sansotheayuth@gmail.com', role: 'Admin',      joined: 'Jan 10, 2026' },
-  { firstName: 'Proeung', lastName: 'Sivly',      email: 'proeungsivly@gmail.com',  role: 'Organizer',  joined: 'Jan 10, 2026' },
-  { firstName: 'Lang',    lastName: 'Socheat',    email: 'langsocheat@gmail.com',   role: 'Attendee',   joined: 'Jan 10, 2026' },
-];
-
 const ROLE_BADGE = { Supervisor: 'badge-role-supervisor', Admin: 'badge-role-admin', Organizer: 'badge-role-organizer', Attendee: 'badge-role-attendee' };
 const ROLE_LABEL = { Supervisor: 'Super Admin', Admin: 'Admin', Organizer: 'Organizer', Attendee: 'Attendee' };
 const AVATAR_BG  = { Supervisor: ['#fef9c3','#a16207'], Admin: ['#dbeafe','#1d4ed8'], Organizer: ['#fce7f3','#be185d'], Attendee: ['#dcfce7','#15803d'] };
 const REFUND_BADGE = { pending: 'badge-pending', approved: 'badge-confirmed', rejected: 'badge-cancelled' };
 const REFUND_LABEL = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' };
-const STATUS_BADGE  = { Available: 'badge-available', Full: 'badge-full', Draft: 'badge-pending' };
-const RECENT_REGS = [
-  { initial: 'M', role: 'Admin',      name: 'Muon Sokea',      event: 'Tech Innovation Summit 2026',   date: 'March 13, 2026', amount: '$300', status: 'confirmed' },
-  { initial: 'P', role: 'Organizer',  name: 'Proeung Sivly',   event: 'Business Leadership Conference', date: 'March 13, 2026', amount: '$300', status: 'pending' },
-  { initial: 'S', role: 'Attendee',   name: 'San Sotheayuth',  event: 'Digital Marketing Workshop',    date: 'March 13, 2026', amount: '$300', status: 'confirmed' },
-  { initial: 'L', role: 'Supervisor', name: 'Lang Socheat',    event: 'Networking & Innovation Forum', date: 'March 13, 2026', amount: '$300', status: 'cancelled' },
-];
+const STATUS_BADGE  = { Available: 'badge-available', Full: 'badge-full', Draft: 'badge-pending', Pending: 'badge-pending', Rejected: 'badge-cancelled' };
 
 const fullName = u => `${u.firstName} ${u.lastName}`.trim() || u.email;
 const initial  = u => (u.firstName || u.email || '?').charAt(0).toUpperCase();
 
-function ChartCanvas({ id }) {
+function ChartCanvas({ id, labels, data }) {
   const canvasRef = useRef(null);
   useEffect(() => {
     let chart;
+    if (!labels || !data) return;
     import('chart.js/auto').then(({ default: Chart }) => {
       if (!canvasRef.current) return;
       const ctx = canvasRef.current.getContext('2d');
@@ -47,8 +35,8 @@ function ChartCanvas({ id }) {
         chart = new Chart(ctx, {
           type: 'line',
           data: {
-            labels: ['Oct','Nov','Dec','Jan','Feb','Mar'],
-            datasets: [{ data: [45000,52000,48000,60000,55000,72000], borderColor:'#4A90D9',
+            labels,
+            datasets: [{ data, borderColor:'#4A90D9',
               backgroundColor:'rgba(74,144,217,0.08)', tension:0.4, fill:true,
               pointBackgroundColor:'#4A90D9', pointRadius:4 }],
           },
@@ -59,8 +47,8 @@ function ChartCanvas({ id }) {
         chart = new Chart(ctx, {
           type: 'bar',
           data: {
-            labels: ['Technology','Business','Workshop','Entertainment','Healthcare'],
-            datasets: [{ data: [45,31,28,32,15], backgroundColor:'#4A90D9', borderRadius:4 }],
+            labels,
+            datasets: [{ data, backgroundColor:'#4A90D9', borderRadius:4 }],
           },
           options: { plugins:{ legend:{ display:false } },
             scales:{ y:{ beginAtZero:true, grid:{ color:'#f0f0f0' } }, x:{ grid:{ display:false } } } },
@@ -68,7 +56,7 @@ function ChartCanvas({ id }) {
       }
     }).catch(() => {});
     return () => chart?.destroy();
-  }, [id]);
+  }, [id, labels, data]);
   return <canvas ref={canvasRef} id={id} height={180} />;
 }
 
@@ -81,10 +69,12 @@ export default function AdminDashboard() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [userSearch, setUserSearch] = useState('');
   const [regSearch, setRegSearch] = useState('');
+  const [users, setUsers] = useState([]);
 
   // Events state
   const [statusFilter, setStatusFilter] = useState('all');
   const [eventSearch, setEventSearch] = useState('');
+  const [events, setEvents] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [usersLoading, setUsersLoading] = useState(true);
   const [refundsLoading, setRefundsLoading] = useState(true);
@@ -98,89 +88,62 @@ export default function AdminDashboard() {
   const [testimonials, setTestimonials] = useState([]);
   const [testimonialSearch, setTestimonialSearch] = useState('');
 
+  // Overview stats (from the real backend)
+  const [overviewStats, setOverviewStats] = useState(null);
+
   // Modal state
   const [modal, setModal] = useState(null); // 'view'|'edit'|'delete'|'eventDelete'|'createUser'
   const [viewUser, setViewUser] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
   const [editRole, setEditRole] = useState('Attendee');
-  const [editStatus, setEditStatus] = useState('Active');
+  const [editStatus, setEditStatus] = useState('active');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [eventDeleteTarget, setEventDeleteTarget] = useState(null);
   const [createForm, setCreateForm] = useState({ firstName: '', lastName: '', email: '', password: '', role: 'Attendee' });
   const [createErr, setCreateErr] = useState('');
-
-  // Refresh key to re-read localStorage after mutations
-  const [tick, setTick] = useState(0);
-  const refresh = () => setTick(t => t + 1);
+  const [actionErr, setActionErr] = useState('');
 
   useBodyScrollLock(!!modal);
   useEscapeKey(() => setModal(null));
 
-  // ── Load refunds and testimonials from API ──────────────────────────────
+  // ── Data fetchers (all real API, no local mock/cache) ───────────────────
+  function refreshUsers() {
+    setUsersLoading(true);
+    return apiGetAllUsers()
+      .then(data => setUsers(Array.isArray(data) ? data : []))
+      .catch(() => setUsers([]))
+      .finally(() => setUsersLoading(false));
+  }
+
+  function refreshEvents() {
+    setEventsLoading(true);
+    return apiGetAllEvents()
+      .then(data => setEvents(Array.isArray(data) ? data : []))
+      .catch(() => setEvents([]))
+      .finally(() => setEventsLoading(false));
+  }
+
   useEffect(() => {
+    refreshUsers();
+    refreshEvents();
     apiGetRefunds()
       .then(data => { setRefunds(Array.isArray(data) ? data : []); setRefundsLoading(false); })
       .catch(() => { setRefunds([]); setRefundsLoading(false); });
     apiGetTestimonials()
       .then(data => setTestimonials(Array.isArray(data) ? data : []))
       .catch(() => setTestimonials([]));
-  }, []);
-
-  // ── Data helpers ────────────────────────────────────────────────────────
-  const getUsers = useCallback(() => {
-    const ov = loadLS('erms_admin_overrides', {});
-    const reserved = RESERVED_USERS
-      .map(u => {
-        const o = (typeof ov === 'object' && !Array.isArray(ov)) ? (ov[u.email] || {}) : {};
-        return { ...u, role: o.role || u.role, status: o.status || 'Active', deleted: !!o.deleted, src: 'reserved' };
-      })
-      .filter(u => !u.deleted);
-    const attendees = loadLS('erms_attendees', []).map(u => ({
-      firstName: u.firstName || '', lastName: u.lastName || '',
-      email: u.email || '', role: u.role || 'Attendee',
-      status: u.status || 'Active',
-      joined: u.joined || (Number(u.id) > 1e12
-        ? fmtDate(new Date(Number(u.id))) : '—'),
-      phone: u.phone || '', address: u.address || '', src: 'attendee',
-    }));
-    return [...reserved, ...attendees];
-  }, [tick]);
-
-  const users = useMemo(() => getUsers(), [getUsers]);
-
-  const getEvents = useCallback(() => {
-    const ov = loadLS('erms_event_overrides', {});
-    const created = loadLS('erms_created_events', []).map(e => ({
-      ...e, reg: Number(e.registered ?? e.attending) || 0,
-      rawStatus: e.status || 'published', src: 'created',
-    }));
-    const createdIds = new Set(created.map(e => String(e.id)));
-    const mockRaw = loadLS('erms_events', []);
-    const mock = mockRaw.map(e => {
-      const o = (typeof ov === 'object' && !Array.isArray(ov)) ? (ov[e.id] || {}) : {};
-      return { ...e, reg: Number(e.attending ?? e.registered) || 0,
-        rawStatus: o.status || 'published', deleted: !!o.deleted, src: 'mock' };
-    }).filter(e => !e.deleted && !createdIds.has(String(e.id)));
-    return [...mock, ...created];
-  }, [tick]);
-
-  const events = useMemo(() => getEvents(), [getEvents]);
-
-  // Brief loading flash for UX consistency
-  useEffect(() => {
-    const t = setTimeout(() => setEventsLoading(false), 250);
-    return () => clearTimeout(t);
-  }, []);
-
-  useEffect(() => {
-    const t = setTimeout(() => setUsersLoading(false), 250);
-    return () => clearTimeout(t);
+    apiGetAdminStats()
+      .then(data => setOverviewStats(data))
+      .catch(() => setOverviewStats(null));
   }, []);
 
   function displayStatus(e) {
-    if (e.rawStatus === 'draft') return 'Draft';
+    if (e.approvalStatus === 'PENDING') return 'Pending';
+    if (e.approvalStatus === 'REJECTED') return 'Rejected';
+    if (!e.published) return 'Draft';
     const cap = Number(e.capacity) || 0;
-    return (cap > 0 && e.reg >= cap) ? 'Full' : 'Available';
+    const reg = Number(e.attending ?? e.registered) || 0;
+    return (cap > 0 && reg >= cap) ? 'Full' : 'Available';
   }
 
   // ── Filtered users ───────────────────────────────────────────────────────
@@ -222,124 +185,140 @@ export default function AdminDashboard() {
 
   // ── Stats ────────────────────────────────────────────────────────────────
   const stats = useMemo(() => {
-    const totalReg = events.reduce((s, e) => s + e.reg, 0);
-    const totalRev = events.reduce((s, e) => s + e.reg * (Number(e.price) || 0), 0);
+    const totalReg = overviewStats?.totalRegistrations ?? events.reduce((s, e) => s + (Number(e.attending) || 0), 0);
+    const totalRev = overviewStats?.totalRevenue ?? events.reduce((s, e) => s + (Number(e.attending) || 0) * (Number(e.price) || 0), 0);
     return [
-      { label: 'Total Events',   value: events.length.toLocaleString(),       sub: 'Live platform count', icon: 'ri-file-list-3-line' },
-      { label: 'Total Users',    value: users.length.toLocaleString(),         sub: 'Live platform count', icon: 'ri-group-line' },
-      { label: 'Total Revenue',  value: '$' + totalRev.toLocaleString(),       sub: 'From registrations × price', icon: 'ri-money-dollar-circle-line' },
-      { label: 'Registrations',  value: totalReg.toLocaleString(),             sub: 'Across all events', icon: 'ri-bar-chart-line' },
+      { label: 'Total Events',   value: (overviewStats?.totalEvents ?? events.length).toLocaleString(),   sub: 'Live platform count', icon: 'ri-file-list-3-line' },
+      { label: 'Total Users',    value: (overviewStats?.totalUsers ?? users.length).toLocaleString(),     sub: 'Live platform count', icon: 'ri-group-line' },
+      { label: 'Total Revenue',  value: '$' + Number(totalRev).toLocaleString(),                          sub: 'From registrations × price', icon: 'ri-money-dollar-circle-line' },
+      { label: 'Registrations',  value: Number(totalReg).toLocaleString(),                                 sub: 'Across all events', icon: 'ri-bar-chart-line' },
     ];
-  }, [events, users]);
+  }, [events, users, overviewStats]);
 
-  // ── Recent regs filter ───────────────────────────────────────────────────
+  const revenueChartData = useMemo(() => {
+    if (!overviewStats?.monthlyRevenue?.length) return null;
+    return {
+      labels: overviewStats.monthlyRevenue.map(m => m.month),
+      data: overviewStats.monthlyRevenue.map(m => m.revenue),
+    };
+  }, [overviewStats]);
+
+  const categoryChartData = useMemo(() => {
+    if (!overviewStats?.eventsByCategory?.length) return null;
+    return {
+      labels: overviewStats.eventsByCategory.map(c => c.category),
+      data: overviewStats.eventsByCategory.map(c => c.count),
+    };
+  }, [overviewStats]);
+
+  // ── Recent regs filter (real data from admin stats) ──────────────────────
+  const recentRegs = overviewStats?.recentRegistrations || [];
   const filteredRecentRegs = useMemo(() =>
-    RECENT_REGS.filter(r => (r.name + ' ' + r.event).toLowerCase().includes(regSearch.toLowerCase())),
-  [regSearch]);
+    recentRegs.filter(r => (r.name + ' ' + r.event).toLowerCase().includes(regSearch.toLowerCase())),
+  [recentRegs, regSearch]);
 
   // ── User actions ─────────────────────────────────────────────────────────
-  function openEdit(email) {
-    const u = users.find(u => u.email === email);
+  function openEdit(id) {
+    const u = users.find(u => u.id === id);
     if (!u) return;
-    setEditTarget(email);
+    setEditTarget(id);
     setEditRole(u.role === 'Supervisor' ? 'Admin' : u.role);
     setEditStatus(u.status);
     setModal('edit');
   }
 
-  function saveEdit() {
-    const u = users.find(u => u.email === editTarget);
-    if (!u) { setModal(null); return; }
-    if (u.src === 'attendee') {
-      const list = loadLS('erms_attendees', []);
-      const i = list.findIndex(a => (a.email || '').toLowerCase() === editTarget.toLowerCase());
-      if (i !== -1) { list[i].role = editRole; list[i].status = editStatus; saveLS('erms_attendees', list);
-        apiUpdateUser(list[i].id, { role: editRole, status: editStatus }).catch(() => {}); }
-    } else {
-      const ov = loadLS('erms_admin_overrides', {});
-      ov[u.email] = { ...(ov[u.email] || {}), role: editRole, status: editStatus };
-      saveLS('erms_admin_overrides', ov);
+  async function saveEdit() {
+    setActionErr('');
+    try {
+      await apiUpdateUser(editTarget, { role: editRole, status: editStatus });
+      await refreshUsers();
+      setModal(null);
+    } catch (err) {
+      setActionErr(err.message || 'Failed to update user.');
     }
-    setModal(null);
-    refresh();
   }
 
-  function toggleSuspend(email) {
-    const u = users.find(u => u.email === email);
+  async function toggleSuspend(id) {
+    const u = users.find(u => u.id === id);
     if (!u) return;
-    const next = u.status === 'Suspended' ? 'Active' : 'Suspended';
-    if (u.src === 'attendee') {
-      const list = loadLS('erms_attendees', []);
-      const i = list.findIndex(a => (a.email || '').toLowerCase() === email.toLowerCase());
-      if (i !== -1) { list[i].status = next; saveLS('erms_attendees', list); }
-    } else {
-      const ov = loadLS('erms_admin_overrides', {});
-      ov[u.email] = { ...(ov[u.email] || {}), status: next };
-      saveLS('erms_admin_overrides', ov);
+    const next = u.status === 'suspended' ? 'active' : 'suspended';
+    try {
+      await apiUpdateUser(id, { status: next });
+      await refreshUsers();
+    } catch (err) {
+      setActionErr(err.message || 'Failed to update user status.');
     }
-    refresh();
   }
 
-  function doDeleteUser() {
-    const u = users.find(u => u.email === deleteTarget);
-    if (!u) { setModal(null); return; }
-    if (u.src === 'attendee') {
-      const remaining = loadLS('erms_attendees', []).filter(a => (a.email || '').toLowerCase() !== deleteTarget.toLowerCase());
-      saveLS('erms_attendees', remaining);
-      if (u.id) apiDeleteUser(u.id).catch(() => {});
-    } else {
-      const ov = loadLS('erms_admin_overrides', {});
-      ov[u.email] = { ...(ov[u.email] || {}), deleted: true };
-      saveLS('erms_admin_overrides', ov);
+  async function doDeleteUser() {
+    if (!deleteTarget) { setModal(null); return; }
+    try {
+      await apiDeleteUser(deleteTarget);
+      await refreshUsers();
+      setModal(null);
+    } catch (err) {
+      setActionErr(err.message || 'Failed to delete user. Only the Supervisor account can delete users.');
+      setModal(null);
     }
-    setModal(null);
-    refresh();
   }
 
-  function createUser() {
+  async function createUser() {
     setCreateErr('');
     const { firstName, lastName, email, password, role } = createForm;
     if (!firstName || !lastName || !email || !password) { setCreateErr('Please fill in all required fields.'); return; }
     if (password.length < 6) { setCreateErr('Password must be at least 6 characters.'); return; }
     if (!/\S+@\S+\.\S+/.test(email)) { setCreateErr('Please enter a valid email address.'); return; }
-    if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) { setCreateErr('An account with this email already exists.'); return; }
-    const newUser = { id: Date.now(), firstName, lastName, email: email.toLowerCase(), role,
-      status: 'Active', joined: fmtDate(new Date()), phone: '', address: '' };
-    saveLS('erms_attendees', [...loadLS('erms_attendees', []), newUser]);
-    apiCreateUser({ firstName, lastName, email: email.toLowerCase(), password, role }).catch(() => {});
-    setCreateForm({ firstName: '', lastName: '', email: '', password: '', role: 'Attendee' });
-    setModal(null);
-    refresh();
+    try {
+      await apiCreateUser({ firstName, lastName, email: email.toLowerCase(), password, role });
+      await refreshUsers();
+      setCreateForm({ firstName: '', lastName: '', email: '', password: '', role: 'Attendee' });
+      setModal(null);
+    } catch (err) {
+      setCreateErr(err.message || 'Failed to create user.');
+    }
   }
 
   // ── Event actions ─────────────────────────────────────────────────────────
-  function setEventStatus(src, id, status) {
-    if (src === 'created') {
-      const list = loadLS('erms_created_events', []);
-      const i = list.findIndex(e => String(e.id) === String(id));
-      if (i !== -1) { list[i].status = status; saveLS('erms_created_events', list); }
-    } else {
-      const ov = loadLS('erms_event_overrides', {});
-      ov[id] = { ...(ov[id] || {}), status };
-      saveLS('erms_event_overrides', ov);
+  async function togglePublishEvent(id) {
+    try {
+      await apiTogglePublish(id);
+      await refreshEvents();
+      window.dispatchEvent(new CustomEvent('erms:events-updated'));
+    } catch (err) {
+      setActionErr(err.message || 'Failed to update event status.');
     }
-    apiTogglePublish(id).catch(() => {});
-    refresh();
   }
 
-  function doDeleteEvent() {
-    if (!eventDeleteTarget) { setModal(null); return; }
-    const { src, id } = eventDeleteTarget;
-    if (src === 'created') {
-      saveLS('erms_created_events', loadLS('erms_created_events', []).filter(e => String(e.id) !== String(id)));
-    } else {
-      const ov = loadLS('erms_event_overrides', {});
-      ov[id] = { ...(ov[id] || {}), deleted: true };
-      saveLS('erms_event_overrides', ov);
+  async function approveEvent(id) {
+    try {
+      await apiApproveEvent(id);
+      await refreshEvents();
+      window.dispatchEvent(new CustomEvent('erms:events-updated'));
+    } catch (err) {
+      setActionErr(err.message || 'Failed to approve event.');
     }
-    apiDeleteEvent(id).catch(() => {});
-    setModal(null);
-    refresh();
+  }
+
+  async function rejectEvent(id) {
+    try {
+      await apiRejectEvent(id);
+      await refreshEvents();
+    } catch (err) {
+      setActionErr(err.message || 'Failed to reject event.');
+    }
+  }
+
+  async function doDeleteEvent() {
+    if (!eventDeleteTarget) { setModal(null); return; }
+    try {
+      await apiDeleteEvent(eventDeleteTarget.id);
+      await refreshEvents();
+      window.dispatchEvent(new CustomEvent('erms:events-updated'));
+      setModal(null);
+    } catch (err) {
+      setActionErr(err.message || 'Failed to delete event.');
+      setModal(null);
+    }
   }
 
   // ── Refund actions ────────────────────────────────────────────────────────
@@ -388,12 +367,20 @@ export default function AdminDashboard() {
 
         <div className="dashboard-body">
 
+          {actionErr && (
+            <div className="card" style={{ padding: '10px 16px', marginBottom: 16, background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>{actionErr}</span>
+              <button className="btn btn-outline btn-sm" onClick={() => setActionErr('')}>Dismiss</button>
+            </div>
+          )}
+
           {/* Tabs */}
           <div className="tabs">
             {[
               { id: 'overview', label: 'Overview',      icon: 'ri-bar-chart-line' },
               { id: 'users',    label: 'Manage Users',  icon: 'ri-group-line' },
               { id: 'events',   label: 'Manage Events', icon: 'ri-calendar-event-line' },
+              { id: 'approvals', label: 'Approvals',    icon: 'ri-check-double-line' },
               { id: 'refunds',  label: 'Refunds',       icon: 'ri-refund-2-line', badge: pendingRefundCount },
               { id: 'testimonials', label: 'Testimonials', icon: 'ri-chat-quote-line' },
             ].map(t => (
@@ -425,8 +412,18 @@ export default function AdminDashboard() {
               </div>
 
               <div className="charts-row">
-                <div className="chart-card"><h3>Monthly Revenue</h3><ChartCanvas id="revenueChart" /></div>
-                <div className="chart-card"><h3>Events by Category</h3><ChartCanvas id="categoryChart" /></div>
+                <div className="chart-card">
+                  <h3>Monthly Revenue</h3>
+                  {revenueChartData
+                    ? <ChartCanvas id="revenueChart" labels={revenueChartData.labels} data={revenueChartData.data} />
+                    : <p style={{ color: 'var(--text-light)', fontSize: 13 }}>No revenue data yet.</p>}
+                </div>
+                <div className="chart-card">
+                  <h3>Events by Category</h3>
+                  {categoryChartData
+                    ? <ChartCanvas id="categoryChart" labels={categoryChartData.labels} data={categoryChartData.data} />
+                    : <p style={{ color: 'var(--text-light)', fontSize: 13 }}>No events yet.</p>}
+                </div>
               </div>
 
               <div className="card" style={{ padding: 20, marginBottom: 20 }}>
@@ -441,23 +438,24 @@ export default function AdminDashboard() {
                   <table className="data-table">
                     <thead><tr><th>ATTENDEE</th><th>EVENT</th><th>DATE</th><th>AMOUNT</th><th>STATUS</th></tr></thead>
                     <tbody>
-                      {filteredRecentRegs.map((r, i) => {
-                        const [bg, fg] = AVATAR_BG[r.role] || ['#e2e8f0','#475569'];
+                      {filteredRecentRegs.length === 0 ? (
+                        <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-light)', padding: 26, fontStyle: 'italic' }}>No registrations yet.</td></tr>
+                      ) : filteredRecentRegs.map((r, i) => {
+                        const [bg, fg] = AVATAR_BG.Attendee;
                         return (
                           <tr key={i}>
                             <td>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                <div className="avatar-circle" style={{ background: bg, color: fg }}>{r.initial}</div>
+                                <div className="avatar-circle" style={{ background: bg, color: fg }}>{(r.name || '?').charAt(0).toUpperCase()}</div>
                                 {r.name}
                               </div>
                             </td>
                             <td>{r.event}</td>
                             <td><i className="ri-time-line" /> {r.date}</td>
-                            <td>{r.amount}</td>
+                            <td>${Number(r.amount || 0).toLocaleString()}</td>
                             <td>
-                              <span className={`badge badge-${r.status}`}>
-                                <i className={r.status === 'confirmed' ? 'ri-checkbox-circle-line' : r.status === 'pending' ? 'ri-time-line' : 'ri-close-circle-line'} />
-                                {' '}{r.status.charAt(0).toUpperCase() + r.status.slice(1)}
+                              <span className={`badge ${REFUND_BADGE[r.status] || 'badge-confirmed'}`}>
+                                {r.status.charAt(0).toUpperCase() + r.status.slice(1)}
                               </span>
                             </td>
                           </tr>
@@ -539,7 +537,7 @@ export default function AdminDashboard() {
                         const [bg, fg] = AVATAR_BG[u.role] || ['#e2e8f0','#475569'];
                         const isProtected = u.role === 'Supervisor' || u.email.toLowerCase() === myEmail;
                         return (
-                          <tr key={u.email} className={u.status === 'Suspended' ? 'muted-row' : ''}>
+                          <tr key={u.id} className={u.status === 'suspended' ? 'muted-row' : ''}>
                             <td>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                 <div className="avatar-circle" style={{ background: bg, color: fg }}>{initial(u)}</div>
@@ -549,11 +547,11 @@ export default function AdminDashboard() {
                             <td>{u.email}</td>
                             <td><span className={`badge ${ROLE_BADGE[u.role] || ''}`}>{ROLE_LABEL[u.role] || u.role}</span></td>
                             <td>
-                              {u.status === 'Suspended'
+                              {u.status === 'suspended'
                                 ? <span className="badge badge-cancelled"><i className="ri-forbid-line" /> Suspended</span>
                                 : <span className="badge badge-confirmed"><i className="ri-checkbox-circle-line" /> Active</span>}
                             </td>
-                            <td>{u.joined}</td>
+                            <td>{fmtDate(u.createdAt) || '—'}</td>
                             <td>
                               {isProtected ? (
                                 <>
@@ -567,11 +565,11 @@ export default function AdminDashboard() {
                               ) : (
                                 <div className="action-btns">
                                   <button className="btn btn-outline btn-sm" title="View" onClick={() => { setViewUser(u); setModal('view'); }}><i className="ri-eye-line" /></button>
-                                  <button className="btn btn-outline btn-sm" title="Edit" onClick={() => openEdit(u.email)}><i className="ri-edit-line" /></button>
-                                  <button className="btn btn-outline btn-sm" title={u.status === 'Suspended' ? 'Unsuspend' : 'Suspend'} onClick={() => toggleSuspend(u.email)}>
-                                    <i className={u.status === 'Suspended' ? 'ri-check-line' : 'ri-forbid-line'} />
+                                  <button className="btn btn-outline btn-sm" title="Edit" onClick={() => openEdit(u.id)}><i className="ri-edit-line" /></button>
+                                  <button className="btn btn-outline btn-sm" title={u.status === 'suspended' ? 'Unsuspend' : 'Suspend'} onClick={() => toggleSuspend(u.id)}>
+                                    <i className={u.status === 'suspended' ? 'ri-check-line' : 'ri-forbid-line'} />
                                   </button>
-                                  <button className="btn btn-danger btn-sm" title="Delete" onClick={() => { setDeleteTarget(u.email); setModal('delete'); }}>
+                                  <button className="btn btn-danger btn-sm" title="Delete" onClick={() => { setDeleteTarget(u.id); setModal('delete'); }}>
                                     <i className="ri-delete-bin-line" />
                                   </button>
                                 </div>
@@ -598,7 +596,7 @@ export default function AdminDashboard() {
               </div>
 
               <div className="role-filter">
-                {['all','Available','Full','Draft'].map(s => (
+                {['all','Pending','Available','Full','Draft','Rejected'].map(s => (
                   <button key={s} className={`role-pill${statusFilter === s ? ' active' : ''}`} onClick={() => setStatusFilter(s)}>
                     {s === 'all' ? 'All' : s}
                   </button>
@@ -651,28 +649,36 @@ export default function AdminDashboard() {
                     <tbody>
                       {filteredEvents.map(e => {
                         const st = displayStatus(e);
-                        const revenue = (e.reg * (Number(e.price) || 0)).toLocaleString();
+                        const reg = Number(e.attending ?? e.registered) || 0;
+                        const revenue = (reg * (Number(e.price) || 0)).toLocaleString();
                         const cap = Number(e.capacity) || 0;
-                        const isDraft = st === 'Draft';
+                        const isPending = st === 'Pending';
+                        const isDraftLike = st === 'Draft';
                         return (
-                          <tr key={`${e.src}-${e.id}`} className={isDraft ? 'muted-row' : ''}>
+                          <tr key={e.id} className={(isPending || isDraftLike) ? 'muted-row' : ''}>
                             <td style={{ fontWeight: 500 }}>{e.title}</td>
-                            <td>Proeung Sivly</td>
+                            <td>{e.organizer ? fullName(e.organizer) : '—'}</td>
                             <td>{e.category || '—'}</td>
                             <td>{fmtDate(e.date, 'long') || '—'}</td>
-                            <td>{e.reg.toLocaleString()}{cap ? ` / ${cap.toLocaleString()}` : ''}</td>
+                            <td>{reg.toLocaleString()}{cap ? ` / ${cap.toLocaleString()}` : ''}</td>
                             <td style={{ color: 'var(--success)', fontWeight: 600 }}>${revenue}</td>
                             <td><span className={`badge ${STATUS_BADGE[st] || ''}`}>{st}</span></td>
                             <td>
                               <div className="action-btns">
-                                <button className="btn btn-outline btn-sm" title="View" onClick={() => {
-                                  localStorage.setItem('erms_selected_event', JSON.stringify({ ...e, attending: e.reg, status: st }));
-                                  navigate('/events/' + e.id);
-                                }}><i className="ri-eye-line" /></button>
-                                {isDraft
-                                  ? <button className="btn btn-success btn-sm" title="Approve" onClick={() => setEventStatus(e.src, e.id, 'published')}><i className="ri-check-line" /></button>
-                                  : <button className="btn btn-outline btn-sm" title="Unpublish" onClick={() => setEventStatus(e.src, e.id, 'draft')}><i className="ri-eye-off-line" /></button>}
-                                <button className="btn btn-danger btn-sm" title="Delete" onClick={() => { setEventDeleteTarget({ src: e.src, id: e.id, title: e.title }); setModal('eventDelete'); }}>
+                                <button className="btn btn-outline btn-sm" title="View" onClick={() => navigate('/events/' + e.id)}>
+                                  <i className="ri-eye-line" />
+                                </button>
+                                {isPending ? (
+                                  <>
+                                    <button className="btn btn-success btn-sm" title="Approve" onClick={() => approveEvent(e.id)}><i className="ri-check-line" /></button>
+                                    <button className="btn btn-danger btn-sm" title="Reject" onClick={() => rejectEvent(e.id)}><i className="ri-close-line" /></button>
+                                  </>
+                                ) : e.approvalStatus === 'APPROVED' ? (
+                                  e.published
+                                    ? <button className="btn btn-outline btn-sm" title="Unpublish" onClick={() => togglePublishEvent(e.id)}><i className="ri-eye-off-line" /></button>
+                                    : <button className="btn btn-success btn-sm" title="Publish" onClick={() => togglePublishEvent(e.id)}><i className="ri-eye-line" /></button>
+                                ) : null}
+                                <button className="btn btn-danger btn-sm" title="Delete" onClick={() => { setEventDeleteTarget({ id: e.id, title: e.title }); setModal('eventDelete'); }}>
                                   <i className="ri-delete-bin-line" />
                                 </button>
                               </div>
@@ -684,6 +690,78 @@ export default function AdminDashboard() {
                   </table>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ════════ APPROVALS ════════ */}
+          {activeTab === 'approvals' && (
+            <div className="tab-content active">
+              <div className="section-header-row">
+                <div className="section-title" style={{ margin: 0 }}>Event Approvals</div>
+                <div style={{ fontSize: 13, color: 'var(--text-light)' }}>
+                  <i className="ri-check-double-line" /> Manage pending event submissions
+                </div>
+              </div>
+
+              {(() => {
+                const pendingEvents = events.filter(e => e.approvalStatus === 'PENDING');
+                if (pendingEvents.length === 0) {
+                  return (
+                    <div className="empty-state">
+                      <i className="ri-checkbox-circle-line" style={{ fontSize: 40, color: 'var(--success)', marginBottom: 12 }} />
+                      <p>All events have been reviewed. No pending approvals.</p>
+                    </div>
+                  );
+                }
+                return (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Event Title</th>
+                          <th>Organizer</th>
+                          <th>Category</th>
+                          <th>Date</th>
+                          <th>Capacity</th>
+                          <th>Price</th>
+                          <th>Status</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pendingEvents.map(e => (
+                          <tr key={e.id}>
+                            <td style={{ fontWeight: 500 }}>{e.title}</td>
+                            <td>{e.organizer ? fullName(e.organizer) : '—'}</td>
+                            <td>{e.category || '—'}</td>
+                            <td>{fmtDate(e.date, 'long') || '—'}</td>
+                            <td>{Number(e.capacity) || '—'}</td>
+                            <td style={{ fontWeight: 600 }}>${Number(e.price) || 0}</td>
+                            <td>
+                              <span className="badge badge-pending">
+                                <i className="ri-time-line" /> Pending
+                              </span>
+                            </td>
+                            <td>
+                              <div className="action-btns">
+                                <button className="btn btn-success btn-sm" title="Approve event" onClick={() => approveEvent(e.id)}>
+                                  <i className="ri-check-line" /> Approve
+                                </button>
+                                <button className="btn btn-danger btn-sm" title="Reject event" onClick={() => rejectEvent(e.id)}>
+                                  <i className="ri-close-line" /> Reject
+                                </button>
+                                <button className="btn btn-outline btn-sm" title="View details" onClick={() => navigate('/events/' + e.id)}>
+                                  <i className="ri-eye-line" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -858,11 +936,10 @@ export default function AdminDashboard() {
                 </div>
                 {[
                   { key: 'Role',     val: <span className={`badge ${ROLE_BADGE[viewUser.role] || ''}`}>{ROLE_LABEL[viewUser.role] || viewUser.role}</span> },
-                  { key: 'Status',   val: viewUser.status },
-                  { key: 'Joined',   val: viewUser.joined },
+                  { key: 'Status',   val: viewUser.status === 'suspended' ? 'Suspended' : 'Active' },
+                  { key: 'Joined',   val: fmtDate(viewUser.createdAt) || '—' },
                   { key: 'Phone',    val: viewUser.phone || '—' },
                   { key: 'Address',  val: viewUser.address || '—' },
-                  { key: 'Account type', val: viewUser.src === 'reserved' ? 'Built-in role account' : 'Registered attendee' },
                 ].map(r => (
                   <div className="detail-row" key={r.key}>
                     <span className="d-key">{r.key}</span>
@@ -887,7 +964,7 @@ export default function AdminDashboard() {
             <button className="m-close" onClick={() => setModal(null)}>&times;</button>
           </div>
           <p className="adm-modal-text" style={{ marginBottom: 4 }}>
-            Editing <strong>{users.find(u => u.email === editTarget) ? fullName(users.find(u => u.email === editTarget)) : ''}</strong>
+            Editing <strong>{users.find(u => u.id === editTarget) ? fullName(users.find(u => u.id === editTarget)) : ''}</strong>
           </p>
           <label className="adm-field-label">Role</label>
           <select className="adm-field-select" value={editRole} onChange={e => setEditRole(e.target.value)}>
@@ -897,8 +974,8 @@ export default function AdminDashboard() {
           </select>
           <label className="adm-field-label">Status</label>
           <select className="adm-field-select" value={editStatus} onChange={e => setEditStatus(e.target.value)}>
-            <option value="Active">Active</option>
-            <option value="Suspended">Suspended</option>
+            <option value="active">Active</option>
+            <option value="suspended">Suspended</option>
           </select>
           <div className="adm-modal-actions">
             <button className="btn btn-outline" onClick={() => setModal(null)}>Cancel</button>
@@ -917,7 +994,7 @@ export default function AdminDashboard() {
           </div>
           <p className="adm-modal-text">
             Are you sure you want to delete{' '}
-            <strong>{users.find(u => u.email === deleteTarget) ? fullName(users.find(u => u.email === deleteTarget)) : ''}</strong>?
+            <strong>{users.find(u => u.id === deleteTarget) ? fullName(users.find(u => u.id === deleteTarget)) : ''}</strong>?
             {' '}This removes their account and cannot be undone.
           </p>
           <div className="adm-modal-actions">

@@ -5,7 +5,9 @@ export default defineConfig({
   plugins: [react()],
   publicDir: 'assets',
   server: {
+    host: '0.0.0.0',
     port: 5173,
+    allowedHosts: true,
     // Proxy /api/* to the Express backend — no CORS headers needed
     proxy: {
       '/api': {
@@ -15,6 +17,11 @@ export default defineConfig({
       '/uploads': {
         target:       'http://localhost:4000',
         changeOrigin: true,
+      },
+      '/socket.io': {
+        target:       'http://localhost:4000',
+        changeOrigin: true,
+        ws:           true,
       },
     },
   },

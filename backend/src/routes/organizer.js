@@ -23,6 +23,7 @@ router.get("/stats", requireAuth, requireRole("Supervisor", "Admin", "Organizer"
         orderBy: { createdAt: "desc" },
         skip,
         take: limit,
+        include: { ticketTypes: { orderBy: { price: "asc" } } },
       }),
       prisma.event.count({ where: whereClause }),
     ]);
@@ -32,7 +33,8 @@ router.get("/stats", requireAuth, requireRole("Supervisor", "Admin", "Organizer"
     // ── Block 2: GROUP BY ticket counts + aggregate revenue + recent tickets (all parallel) ──
     // These only need eventIds (from Block 1), so they can run concurrently
     const [countsResult, aggResult, recentTicketsResult] = await Promise.all([
-      // Single GROUP BY query (replaces N+1 _count subqueries!)
+      // Single GROUP BY query (replaces N+1 _count subqueries!) — sums seats
+      // booked (quantity) per event, not ticket row count.
       eventIds.length > 0
         ? prisma.ticket.groupBy({
             by: ["eventId"],
@@ -40,14 +42,14 @@ router.get("/stats", requireAuth, requireRole("Supervisor", "Admin", "Organizer"
               eventId: { in: eventIds },
               status:  { not: "cancelled" },
             },
-            _count: { id: true },
+            _sum: { quantity: true },
           })
         : Promise.resolve([]),
 
-      // Aggregate revenue & total registrations across ALL events (no organizer filter)
+      // Aggregate revenue & total registrations (seats booked) across ALL events
       prisma.$queryRaw`
           SELECT
-            COUNT(*)::int                        AS "count",
+            COALESCE(SUM(t."quantity"), 0)::int  AS "count",
             COALESCE(SUM(t."price" * t."quantity"), 0)::float AS "revenue"
           FROM "Ticket" t
           WHERE t."status" != 'cancelled'
@@ -72,7 +74,7 @@ router.get("/stats", requireAuth, requireRole("Supervisor", "Admin", "Organizer"
 
     // ── Parse results ──
     const ticketCountMap = Object.fromEntries(
-      (countsResult || []).map(c => [c.eventId, c._count.id])
+      (countsResult || []).map(c => [c.eventId, c._sum.quantity || 0])
     );
 
     const aggRow = Array.isArray(aggResult) ? aggResult[0] : aggResult;
@@ -110,8 +112,11 @@ router.get("/stats", requireAuth, requireRole("Supervisor", "Admin", "Organizer"
         capacity: e.capacity,
         registered: ticketCountMap[e.id] || 0,
         status: e.published ? "published" : "draft",
+        approvalStatus: e.approvalStatus,
         description: e.description,
         category: e.category,
+        agenda: e.agenda,
+        ticketTypes: e.ticketTypes,
       })),
     });
   } catch (err) {

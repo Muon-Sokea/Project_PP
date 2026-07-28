@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useNotifications } from '../../context/NotificationContext.jsx';
 import { apiGetEventById } from '../../services/event.service.js';
+import { apiGetBookmarks, apiCheckBookmark, apiBookmarkEvent, apiUnbookmarkEvent } from '../../services/bookmark.service.js';
 import { useScrollListener } from '../../hooks/useScrollListener.js';
 import { useToast } from '../../hooks/useToast.js';
 import { fmtDate } from '../../utils/formatDate.js';
@@ -29,33 +31,60 @@ export default function EventDetailPage() {
   const { id }        = useParams();
   const navigate      = useNavigate();
   const { user, role, logout } = useAuth();
+  const { socket } = useNotifications();
 
   const [event,       setEvent]       = useState(null);
   const [loading,     setLoading]     = useState(true);
   const [saved,       setSaved]       = useState(false);
+  const [bookmarkCount, setBookmarkCount] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('erms_saved_events') || '[]').length; } catch { return 0; }
+  });
   const [agendaDay,   setAgendaDay]   = useState(null);
   const [showMap,     setShowMap]     = useState(false);
   const [toast,       showToast]      = useToast();
   const [navOpen,     setNavOpen]     = useState(false);
   const navScrolled = useScrollListener();
 
+  // ── Load bookmark count ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!user) return;
+    apiGetBookmarks().then(data => {
+      if (Array.isArray(data)) setBookmarkCount(data.length);
+    }).catch(() => {});
+  }, [user]);
+
   // ── Load event ────────────────────────────────────────────────────────────
   useEffect(() => {
     async function load() {
-      // Try localStorage first (set by EventsPage click)
+      // Always fetch the live event from the API; only fall back to a cached
+      // copy (set by EventsPage click) if the API is unreachable, so stale or
+      // deleted events can't reappear as if they still existed.
       let ev = null;
       try {
-        const stored = JSON.parse(localStorage.getItem('erms_selected_event') || 'null');
-        if (stored && String(stored.id) === String(id)) ev = stored;
-      } catch {}
-
-      if (!ev) {
-        try { ev = await apiGetEventById(id); } catch {}
+        ev = await apiGetEventById(id);
+      } catch {
+        try {
+          const stored = JSON.parse(localStorage.getItem('erms_selected_event') || 'null');
+          if (stored && String(stored.id) === String(id)) ev = stored;
+        } catch {}
       }
       if (ev) {
-        // Generate default schedule if none exists (create new object to avoid mutation)
+        // Group the organizer's real agenda entries under the event's date;
+        // only fall back to a generated placeholder schedule if none were entered.
         let evFinal = { ...ev };
-        if (!evFinal.agenda || !Object.keys(evFinal.agenda).length) {
+        if (Array.isArray(evFinal.agenda) && evFinal.agenda.length > 0) {
+          const d = new Date(evFinal.date);
+          const dayLabel = isNaN(d.getTime())
+            ? 'Schedule'
+            : d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+          evFinal.agenda = {
+            [dayLabel]: evFinal.agenda.map(a => ({
+              time:  a.time || 'TBA',
+              title: a.session,
+              sub:   a.speaker ? `Speaker: ${a.speaker}` : undefined,
+            })),
+          };
+        } else {
           const defaultAgenda = generateDefaultSchedule(evFinal);
           if (defaultAgenda) evFinal.agenda = defaultAgenda;
         }
@@ -63,33 +92,85 @@ export default function EventDetailPage() {
         document.title = `Planning Center — ${ev.title || 'Event'}`;
         const days = evFinal.agenda ? Object.keys(evFinal.agenda) : [];
         if (days.length) setAgendaDay(days[0]);
+        // Check bookmark status from API and localStorage fallback
         const savedList = getSavedList();
-        setSaved(savedList.includes(evFinal.id));
+        if (user) {
+          try {
+            const bookmarked = await apiCheckBookmark(evFinal.id);
+            setSaved(bookmarked);
+          } catch {
+            setSaved(savedList.includes(evFinal.id));
+          }
+        } else {
+          setSaved(savedList.includes(evFinal.id));
+        }
       }
       setLoading(false);
     }
     load();
-  }, [id]);
+  }, [id, user]);
+
+  // ── Live seat availability — join this event's room and update on push ────
+  useEffect(() => {
+    if (!socket || !event?.id) return;
+    const eventId = event.id;
+    socket.emit('join-event', eventId);
+    function onCapacityUpdate(payload) {
+      if (Number(payload.eventId) === Number(eventId)) {
+        setEvent(prev => (prev ? { ...prev, attending: payload.attending } : prev));
+      }
+    }
+    socket.on('capacity-update', onCapacityUpdate);
+    return () => {
+      socket.off('capacity-update', onCapacityUpdate);
+      socket.emit('leave-event', eventId);
+    };
+  }, [socket, event?.id]);
 
   // ── Toast is now handled by useToast() hook
 
-  // ── Saved events ──────────────────────────────────────────────────────────
+  // ── Saved events (local-first — don't revert on API failure) ─────────────
   function getSavedList() {
     try { return JSON.parse(localStorage.getItem('erms_saved_events') || '[]'); } catch { return []; }
   }
-  function toggleSave() {
+  async function toggleSave() {
     if (!event) return;
     let list = getSavedList();
     if (list.includes(event.id)) {
       list = list.filter(i => i !== event.id);
       setSaved(false);
+      setBookmarkCount(c => Math.max(0, c - 1));
       showToast('Removed from saved');
+      localStorage.setItem('erms_saved_events', JSON.stringify(list));
+      // Also remove from detail cache
+      try {
+        const stored = JSON.parse(localStorage.getItem('erms_saved_events_detail') || '[]');
+        localStorage.setItem('erms_saved_events_detail', JSON.stringify(stored.filter(s => s.id !== event.id)));
+      } catch {}
+      if (user) {
+        // Try API silently — don't revert local state on failure
+        try { await apiUnbookmarkEvent(event.id); } catch {}
+      }
     } else {
       list.push(event.id);
       setSaved(true);
+      setBookmarkCount(c => c + 1);
       showToast('Saved to your list');
+      localStorage.setItem('erms_saved_events', JSON.stringify(list));
+      // Also store full detail in cache for bookmarks page
+      try {
+        const stored = JSON.parse(localStorage.getItem('erms_saved_events_detail') || '[]');
+        if (event && !stored.some(s => s.id === event.id)) {
+          stored.push(event);
+          localStorage.setItem('erms_saved_events_detail', JSON.stringify(stored));
+        }
+      } catch {}
+      if (user) {
+        // Try API silently — don't revert local state on failure
+        try { await apiBookmarkEvent(event.id); } catch {}
+      }
     }
-    localStorage.setItem('erms_saved_events', JSON.stringify(list));
+    window.dispatchEvent(new CustomEvent('erms:bookmarks-updated'));
   }
 
   // ── Share ─────────────────────────────────────────────────────────────────
@@ -180,6 +261,17 @@ export default function EventDetailPage() {
         <button className="hamburger" onClick={() => setNavOpen(o => !o)}><span /><span /><span /></button>
         <div className={`nav-links${navOpen ? ' open' : ''}`}>
           <Link to="/" className="btn btn-primary"><i className="ri-home-line" /> Home</Link>
+          {user && (
+            <button
+              className="nav-icon-btn nav-bookmark-btn"
+              onClick={() => navigate('/bookmarks')}
+              title={`${bookmarkCount} saved event${bookmarkCount !== 1 ? 's' : ''}`}
+              aria-label={`${bookmarkCount} saved event${bookmarkCount !== 1 ? 's' : ''}`}
+            >
+              <i className={bookmarkCount > 0 ? 'ri-bookmark-fill' : 'ri-bookmark-line'} />
+              {bookmarkCount > 0 && <span className="nav-badge">{bookmarkCount}</span>}
+            </button>
+          )}
           {user
             ? <button className="btn btn-outline" onClick={() => navigate(ROLE_ROUTES[role] || '/')}><i className="ri-dashboard-line" /> Dashboard</button>
             : <Link to="/login" className="btn btn-outline"><i className="ri-login-box-line" /> Login</Link>}

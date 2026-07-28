@@ -1,6 +1,11 @@
+const path   = require("path");
+const fs     = require("fs");
+const os     = require("os");
 require("dotenv").config();
+const http    = require("http");
 const express = require("express");
 const cors    = require("cors");
+const { initSocket } = require("./lib/socket");
 
 const authRoutes          = require("./routes/auth");
 const eventRoutes         = require("./routes/events");
@@ -12,6 +17,8 @@ const uploadRoutes        = require("./routes/upload");
 const organizerRoutes     = require("./routes/organizer");
 const userRoutes          = require("./routes/users");
 const adminRoutes         = require("./routes/admin");
+const notificationRoutes  = require("./routes/notifications");
+const bookmarkRoutes      = require("./routes/bookmarks");
 const errorHandler        = require("./middleware/errorHandler");
 
 const app  = express();
@@ -21,6 +28,7 @@ const PORT = process.env.PORT || 4000;
 const ALLOWED_ORIGINS = [
   process.env.FRONTEND_URL,
   "http://127.0.0.1:5173", "http://localhost:5173",
+  "http://10.4.30.219:5173",
   "http://127.0.0.1:5500", "http://localhost:5500",
   "http://127.0.0.1:5501", "http://localhost:5501",
   "http://127.0.0.1:3000", "http://localhost:3000",
@@ -52,15 +60,39 @@ app.use("/api/users",         userRoutes);
 app.use("/api/admin",         adminRoutes);
 app.use("/api/upload",        uploadRoutes);
 app.use("/api/organizer",     organizerRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/bookmarks",      bookmarkRoutes);
 
 // Serve uploaded images statically
 app.use("/uploads", express.static("uploads"));
 
+// Serve built frontend SPA (dist folder) — no Vite WebSocket needed
+const frontendDist = path.join(__dirname, "..", "..", "frontend", "dist");
+if (fs.existsSync(frontendDist)) {
+  app.use(express.static(frontendDist));
+  // SPA fallback: serve index.html for all non-API routes
+  app.get("*", (req, res) => {
+    if (req.path.startsWith("/api")) return res.status(404).json({ error: "Not found" });
+    res.sendFile(path.join(frontendDist, "index.html"));
+  });
+  console.log(`Frontend SPA served from ${frontendDist}`);
+}
+
 app.use(errorHandler);
 
+const server = http.createServer(app);
+initSocket(server);
+
 // start
-app.listen(PORT, () => {
+server.listen(PORT, "0.0.0.0", () => {
   if (process.env.NODE_ENV !== "production") {
     console.log(`ERMS API running on http://localhost:${PORT}`);
+  }
+  const ifaces = os.networkInterfaces();
+  if (ifaces) {
+    const addresses = Object.values(ifaces).flat().filter(i => i && i.family === "IPv4" && !i.internal);
+    if (addresses.length > 0) {
+      console.log(`🌐 Network access: http://${addresses[0].address}:${PORT}`);
+    }
   }
 });

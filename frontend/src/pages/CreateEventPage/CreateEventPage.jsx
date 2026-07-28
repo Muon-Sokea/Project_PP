@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { apiCreateEvent, apiUpdateEvent } from '../../services/event.service.js';
 import { apiUploadImage } from '../../services/organizer.service.js';
-import { fmtDate } from '../../utils/formatDate.js';
 import '../../../assets/css/1_global.css';
 import '../../../assets/css/2_navbar.css';
 import './CreateEventPage.css';
@@ -97,8 +96,17 @@ export default function CreateEventPage() {
       setEndTime(to24(b.trim()));
     }
     if (raw.image) setImageData(raw.image);
-    if (raw.price != null || raw.capacity != null) {
+
+    if (Array.isArray(raw.ticketTypes) && raw.ticketTypes.length > 0) {
+      setTickets(raw.ticketTypes.map(t => ({
+        name: t.name || '', price: String(t.price ?? ''), qty: String(t.quantity ?? ''), desc: t.description || '',
+      })));
+    } else if (raw.price != null || raw.capacity != null) {
       setTickets([{ name: 'General Admission', price: String(raw.price || ''), qty: String(raw.capacity || ''), desc: '' }]);
+    }
+
+    if (Array.isArray(raw.agenda) && raw.agenda.length > 0) {
+      setAgenda(raw.agenda.map(a => ({ time: a.time || '', session: a.session || '', speaker: a.speaker || '' })));
     }
   }, []);
 
@@ -107,8 +115,18 @@ export default function CreateEventPage() {
 
   // ── Build proper API payload (not display-formatted) ─────────────────────
   function buildApiData() {
-    const capacity = tickets.reduce((s, t) => s + (Number(t.qty) || 0), 0) || 100;
-    const price = Number(tickets[0]?.price) || 0;
+    const ticketTypes = tickets
+      .filter(t => t.name.trim())
+      .map(t => ({
+        name: t.name.trim(),
+        price: Number(t.price) || 0,
+        quantity: Number(t.qty) || 0,
+        description: (t.desc || '').trim(),
+      }));
+    // Fallback capacity/price if no real ticket type rows were filled in —
+    // the backend derives these from ticketTypes whenever any are provided.
+    const capacity = ticketTypes.reduce((s, t) => s + t.quantity, 0) || 100;
+    const price = ticketTypes[0]?.price || 0;
     return {
       title: title.trim() || 'Untitled Event',
       description: description.trim() || 'No description yet.',
@@ -119,70 +137,21 @@ export default function CreateEventPage() {
       price,
       category: category || 'General',
       image: imageData || '/images/Tech1.jpg',
+      agenda: agenda
+        .filter(a => a.session.trim())
+        .map(a => ({ time: a.time.trim(), session: a.session.trim(), speaker: a.speaker.trim() })),
+      ticketTypes,
     };
-  }
-
-  // ── Remove an entry from local storage by id ─────────────────────────────
-  function removeFromLocalStore(id) {
-    try {
-      const stored = JSON.parse(localStorage.getItem('erms_created_events') || '[]');
-      const filtered = stored.filter(e => String(e.id) !== String(id));
-      localStorage.setItem('erms_created_events', JSON.stringify(filtered));
-    } catch {}
-  }
-
-  // ── Step helpers ──────────────────────────────────────────────────────────
-  function buildEvent(status) {
-    const d = startDate ? new Date(startDate) : null;
-    const dateStr = (d && !isNaN(d.getTime()))
-      ? fmtDate(d, 'long')
-      : 'TBA';
-    let capacity = tickets.reduce((s, t) => s + (Number(t.qty) || 0), 0) || 100;
-    const price = Number(tickets[0]?.price) || 0;
-    return {
-      id:          editingEvent ? editingEvent.id : Date.now(),
-      title:       title.trim() || 'Untitled Event',
-      category:    category || 'General',
-      date:        dateStr,
-      time:        fmtTime(startTime, endTime),
-      location:    (venueName || venueAddress || 'TBA').trim(),
-      image:       imageData || '/images/Tech1.jpg',
-      price,
-      capacity,
-      registered:  editingEvent ? (Number(editingEvent.registered) || 0) : 0,
-      status,
-      description: description.trim() || 'No description yet.',
-    };
-  }
-
-  function saveCreatedEvent(ev) {
-    const push = (obj) => {
-      const list = JSON.parse(localStorage.getItem('erms_created_events') || '[]');
-      const i = list.findIndex(e => String(e.id) === String(obj.id));
-      if (i !== -1) list[i] = obj; else list.push(obj);
-      localStorage.setItem('erms_created_events', JSON.stringify(list));
-    };
-    try { push(ev); } catch {
-      ev.image = '/images/Tech1.jpg';
-      try { push(ev); } catch {}
-    }
   }
 
   async function publish() {
     if (!title.trim()) { alert('Please enter an event title before publishing.'); setStep(1); return; }
     setSubmitting(true);
-    const ev = buildEvent(editingEvent ? editingEvent.status || 'published' : 'published');
-    saveCreatedEvent(ev);
-
     try {
       if (editingEvent) {
         await apiUpdateEvent(editingEvent.id, buildApiData());
-        // API succeeded — remove local override so dashboard re-fetches fresh data with real registration counts
-        removeFromLocalStore(editingEvent.id);
       } else {
         await apiCreateEvent(buildApiData());
-        // API succeeded — remove temp-id entry; dashboard will fetch the real event from API
-        removeFromLocalStore(ev.id);
       }
     } catch (err) {
       console.error('Failed to publish event:', err);
@@ -198,20 +167,20 @@ export default function CreateEventPage() {
 
   async function saveDraft() {
     if (!title.trim()) { alert('Add an event title first, then save your draft.'); return; }
-    const ev = buildEvent('draft');
-    saveCreatedEvent(ev);
+    setSubmitting(true);
     try {
-      const serverEvent = await apiCreateEvent(buildApiData());
-      // API succeeded — remove temp-id entry; dashboard fetches fresh data on next load
-      if (serverEvent && serverEvent.id) {
-        removeFromLocalStore(ev.id);
+      if (editingEvent) {
+        await apiUpdateEvent(editingEvent.id, buildApiData());
+      } else {
+        await apiCreateEvent(buildApiData());
       }
+      alert('Draft saved to your dashboard.');
+      navigate('/organizer');
     } catch (err) {
-      console.error('Failed to save draft to API:', err);
-      // Draft is still saved locally as fallback
+      console.error('Failed to save draft:', err);
+      alert('Failed to save draft. Check your connection and try again.');
     }
-    alert('Draft saved to your dashboard.');
-    navigate('/organizer');
+    setSubmitting(false);
   }
 
   function changeStep(dir) {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiTogglePublish, apiDeleteEvent } from '../../services/event.service.js';
+import { apiDeleteEvent, apiCreateEvent } from '../../services/event.service.js';
 import { apiGetOrganizerStats } from '../../services/organizer.service.js';
 import { apiGetEventAttendees } from '../../services/registration.service.js';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock.js';
@@ -80,10 +80,6 @@ export default function OrganizerDashboard() {
       }
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
-      try {
-        const created = JSON.parse(localStorage.getItem('erms_created_events') || '[]');
-        if (created.length) setEvents(created);
-      } catch {}
     }
   }
 
@@ -115,20 +111,6 @@ export default function OrganizerDashboard() {
       setLoadingMore(false);
     }
   }
-
-  // Merge any locally-created events (drafts saved offline)
-  useEffect(() => {
-    try {
-      const created = JSON.parse(localStorage.getItem('erms_created_events') || '[]');
-      if (created.length) {
-        const createdIds = new Set(created.map(e => String(e.id)));
-        setEvents(prev => {
-          const existing = prev.filter(e => !createdIds.has(String(e.id)));
-          return [...existing, ...created];
-        });
-      }
-    } catch {}
-  }, []);
 
   // ── Fetch event-specific attendees when switching to attendees view ──────
   useEffect(() => {
@@ -187,6 +169,10 @@ export default function OrganizerDashboard() {
 
   const currentEvent = useMemo(() => events.find(e => e.id === currentEventId), [events, currentEventId]);
 
+  // Log for debugging
+  console.log('[OrganizerDashboard] events:', events.length, 'loading:', loading, 'stats:', !!stats);
+  if (events.length > 0) console.log('[OrganizerDashboard] first event:', events[0].title, events[0].status);
+
   // ── Home stats ──────────────────────────────────────────────────────────
   const statCards = useMemo(() => {
     if (stats) {
@@ -214,44 +200,26 @@ export default function OrganizerDashboard() {
   }, [events, stats]);
 
   // ── Event actions ───────────────────────────────────────────────────────
-  async function togglePublish(id) {
-    const ev = events.find(e => e.id === id);
-    const prevStatus = ev?.status || 'draft';
-    const nextStatus = prevStatus === 'published' ? 'draft' : 'published';
-    // Optimistic update
-    setEvents(es => es.map(e => e.id === id ? { ...e, status: nextStatus } : e));
-    try {
-      const updated = await apiTogglePublish(id);
-      // Real-time update with server response
-      if (updated && updated.published !== undefined) {
-        setEvents(es => es.map(e =>
-          e.id === id
-            ? { ...e, status: updated.published ? 'published' : 'draft' }
-            : e
-        ));
-      }
-      showToast(nextStatus === 'published' ? 'Event published' : 'Event unpublished');
-      // Notify public page to update in real-time
-      window.dispatchEvent(new CustomEvent('erms:events-updated'));
-    } catch (err) {
-      // Revert on failure
-      setEvents(es => es.map(e => e.id === id ? { ...e, status: prevStatus } : e));
-      showToast(`Failed to update status: ${err.message}`);
-    }
-  }
-
-  function duplicateEvent(id) {
+  async function duplicateEvent(id) {
     const ev = events.find(e => e.id === id);
     if (!ev) return;
-    const copy = { ...ev, id: Date.now(), title: 'Copy of ' + ev.title, status: 'draft', registered: 0 };
-    const newEvents = [...events, copy];
-    setEvents(newEvents);
     try {
-      const stored = JSON.parse(localStorage.getItem('erms_created_events') || '[]');
-      stored.push(copy);
-      localStorage.setItem('erms_created_events', JSON.stringify(stored));
-    } catch {}
-    showToast(`Event duplicated as draft: "${copy.title}"`);
+      await apiCreateEvent({
+        title: 'Copy of ' + ev.title,
+        description: ev.description || '',
+        date: ev.date,
+        time: ev.time || '',
+        location: ev.location || 'TBA',
+        capacity: Number(ev.capacity) || 100,
+        price: Number(ev.price) || 0,
+        category: ev.category || 'General',
+        image: ev.image || '',
+      });
+      await loadDashboard(1);
+      showToast(`Event duplicated as a new submission: "Copy of ${ev.title}"`);
+    } catch (err) {
+      showToast(`Failed to duplicate event: ${err.message}`);
+    }
   }
 
   async function doDelete() {
@@ -264,21 +232,7 @@ export default function OrganizerDashboard() {
     setDeleteTarget(null);
     setView('home');
 
-    // Remove from localStorage and check if this was a local-only event (no API call needed)
-    let isLocalOnly = false;
-    try {
-      const created = JSON.parse(localStorage.getItem('erms_created_events') || '[]');
-      isLocalOnly = created.some(e => String(e.id) === String(deleteTarget));
-      localStorage.setItem('erms_created_events', JSON.stringify(created.filter(e => String(e.id) !== String(deleteTarget))));
-    } catch {}
-
-    if (isLocalOnly) {
-      // Local-only event (duplicate or offline draft) — no API needed
-      showToast('Event has been deleted!');
-      return;
-    }
-
-    // Server event — call API to delete from database, then re-fetch fresh data
+    // Call API to delete from database, then re-fetch fresh data
     try {
       await apiDeleteEvent(deleteTarget);
       await loadDashboard(1);
@@ -397,9 +351,19 @@ export default function OrganizerDashboard() {
                         </div>
                         <div className="org-event-info">
                           <div style={{ marginBottom: 6 }}>
-                            <span className={`badge ${ev.status === 'published' ? 'badge-confirmed' : 'badge-pending'}`}>
-                              {ev.status === 'published' ? 'Published' : 'Draft'}
-                            </span>
+                            {(() => {
+                              const approval = ev.approvalStatus;
+                              if (approval === 'PENDING') {
+                                return <span className="badge badge-pending"><i className="ri-time-line" /> Pending Approval</span>;
+                              }
+                              if (approval === 'REJECTED') {
+                                return <span className="badge badge-cancelled"><i className="ri-close-circle-line" /> Rejected</span>;
+                              }
+                              if (ev.status === 'published') {
+                                return <span className="badge badge-confirmed"><i className="ri-checkbox-circle-line" /> Published</span>;
+                              }
+                              return <span className="badge badge-pending"><i className="ri-eye-off-line" /> Unpublished</span>;
+                            })()}
                           </div>
                           <h3>{ev.title}</h3>
                           <div className="org-event-date"><i className="ri-calendar-line" /> {fmtDate(ev.date, 'long')}</div>
@@ -485,12 +449,6 @@ export default function OrganizerDashboard() {
                 }}>
                   <i className="ri-edit-line" /> Edit
                 </button>
-                <button className="btn btn-outline btn-sm" onClick={() => togglePublish(currentEvent.id)}>
-                  {currentEvent.status === 'published'
-                    ? <><i className="ri-eye-off-line" /> Unpublish</>
-                    : <><i className="ri-send-plane-line" /> Publish</>}
-                </button>
-
               </div>
 
               {/* Event detail */}
@@ -498,9 +456,17 @@ export default function OrganizerDashboard() {
                 <img className="ev-summary-img" src={currentEvent.image} alt={currentEvent.title}
                   loading="lazy" decoding="async" onError={e => { e.currentTarget.src = '/images/Sport%20event.jpg'; }} />
                 <div style={{ marginBottom: 8 }}>
-                  <span className={`badge ${currentEvent.status === 'published' ? 'badge-confirmed' : 'badge-pending'}`}>
-                    {currentEvent.status === 'published' ? 'Published' : 'Draft'}
-                  </span>
+                  {(() => {
+                    if (currentEvent.approvalStatus === 'PENDING') {
+                      return <span className="badge badge-pending"><i className="ri-time-line" /> Pending Approval</span>;
+                    }
+                    if (currentEvent.approvalStatus === 'REJECTED') {
+                      return <span className="badge badge-cancelled"><i className="ri-close-circle-line" /> Rejected</span>;
+                    }
+                    return currentEvent.status === 'published'
+                      ? <span className="badge badge-confirmed"><i className="ri-checkbox-circle-line" /> Published</span>
+                      : <span className="badge badge-pending"><i className="ri-eye-off-line" /> Unpublished</span>;
+                  })()}
                 </div>
                 <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 10 }}>{currentEvent.title}</h2>
                 <p style={{ fontSize: 14, color: 'var(--text-medium)', lineHeight: 1.7, marginBottom: 14 }}>{currentEvent.description}</p>

@@ -49,8 +49,9 @@ router.post(
   upload.single("image"),
   (req, res) => {
     if (!req.file) return res.status(400).json({ error: "No image file provided." });
-    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
-    res.json({ url: fileUrl, filename: req.file.filename });
+    // Relative path — resolved by the browser against whatever origin served the page
+    // (works through the Vite dev proxy, tunnels, and the single-origin production server alike).
+    res.json({ url: `/uploads/${req.file.filename}`, filename: req.file.filename });
   },
 );
 

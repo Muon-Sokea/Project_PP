@@ -1,6 +1,7 @@
 const express = require("express");
 const { PrismaClient } = require("@prisma/client");
 const { requireAuth, requireRole } = require("../middleware/auth");
+const { notifyUser, notifyRoles, broadcastCapacity } = require("../lib/notify");
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -23,8 +24,16 @@ router.post("/", requireAuth, async (req, res, next) => {
       data: { ticketCode, eventName, reason, details, userId: req.user.id },
     });
 
-    // Mark ticket as cancelled
+    // Mark ticket as cancelled — this frees the seat immediately
     await prisma.ticket.update({ where: { ticketCode }, data: { status: "cancelled" } });
+    broadcastCapacity(ticket.eventId);
+
+    notifyRoles(["Admin", "Supervisor"], {
+      type: "refund_requested",
+      title: "New refund request",
+      message: `A refund was requested for "${eventName}".`,
+      link: `/admin`,
+    }).catch(err => console.warn("notifyRoles failed:", err.message));
 
     res.status(201).json(refund);
   } catch (err) { next(err); }
@@ -57,6 +66,14 @@ router.patch("/:ticketCode", requireAuth, requireRole("Supervisor", "Admin"), as
       where: { ticketCode: req.params.ticketCode },
       data:  { status, resolvedAt: new Date() },
     });
+
+    notifyUser(refund.userId, {
+      type: "refund_resolved",
+      title: `Refund ${status}`,
+      message: `Your refund for "${refund.eventName}" was ${status}.`,
+      link: `/dashboard`,
+    }).catch(err => console.warn("notifyUser failed:", err.message));
+
     res.json(updated);
   } catch (err) { next(err); }
 });

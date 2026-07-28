@@ -19,6 +19,12 @@ enum UserStatus {
   suspended
 }
 
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum TicketStatus {
   confirmed
   cancelled
@@ -37,12 +43,16 @@ model User {
   lastName      String
   email         String        @unique
   password      String
+  googleId      String?       @unique
+  telegramId    String?       @unique
+  avatar        String        @default("")
   phone         String        @default("")
   address       String        @default("")
   role          Role          @default(Attendee)
   status        UserStatus    @default(active)
   otpCode       String?
   otpExpiresAt  DateTime?
+  notificationPrefs Json    @default("{}")
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -50,32 +60,68 @@ model User {
   tickets       Ticket[]
   refunds       Refund[]
   testimonials  Testimonial[]
+  bookmarks     Bookmark[]
+  notifications Notification[]
 }
 
 model Event {
-  id          Int       @id @default(autoincrement())
-  title       String
-  description String    @default("")
-  date        DateTime
-  time        String    @default("")
-  location    String
-  capacity    Int       @default(100)
-  price       Decimal   @default(0) @db.Decimal(10, 2)
-  category    String    @default("General")
-  image       String    @default("")
-  published   Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id              Int            @id @default(autoincrement())
+  title           String
+  description     String         @default("")
+  date            DateTime
+  time            String         @default("")
+  location        String
+  capacity        Int            @default(100)
+  price           Decimal        @default(0) @db.Decimal(10, 2)
+  category        String         @default("General")
+  image           String         @default("")
+  agenda          Json           @default("[]")
+  published       Boolean        @default(false)
+  approvalStatus  ApprovalStatus @default(PENDING)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   organizer   User      @relation("OrganizerEvents", fields: [organizerId], references: [id])
   organizerId Int
 
   tickets     Ticket[]
   testimonials Testimonial[]
+  bookmarks   Bookmark[]
+  ticketTypes TicketType[]
 
   @@index([organizerId, createdAt])
   @@index([createdAt])
   @@index([organizerId])
+  @@index([approvalStatus])
+}
+
+model TicketType {
+  id          Int      @id @default(autoincrement())
+  name        String
+  price       Decimal  @default(0) @db.Decimal(10, 2)
+  quantity    Int      @default(0)
+  description String   @default("")
+  createdAt   DateTime @default(now())
+
+  event   Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId Int
+
+  tickets Ticket[]
+
+  @@index([eventId])
+}
+
+model Bookmark {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+
+  user   User  @relation(fields: [userId], references: [id])
+  userId Int
+  event  Event @relation(fields: [eventId], references: [id])
+  eventId Int
+
+  @@unique([userId, eventId])
+  @@index([userId, createdAt])
 }
 
 model Ticket {
@@ -91,6 +137,9 @@ model Ticket {
   userId       Int
   event        Event        @relation(fields: [eventId], references: [id])
   eventId      Int
+
+  ticketTypeRef   TicketType? @relation(fields: [ticketTypeId], references: [id], onDelete: SetNull)
+  ticketTypeId    Int?
 
   refund       Refund?
 
@@ -123,6 +172,21 @@ model Testimonial {
   userId    Int
   event     Event?   @relation(fields: [eventId], references: [id])
   eventId   Int?
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  type      String
+  title     String
+  message   String   @default("")
+  link      String   @default("")
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int
+
+  @@index([userId, read, createdAt])
 }
 
 model HealthCheck {

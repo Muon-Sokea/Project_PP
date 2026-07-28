@@ -49,4 +49,154 @@ async function sendOtpEmail(to, otp, purpose = "verification") {
   });
 }
 
-module.exports = { sendOtpEmail, transporter };
+/**
+ * Build a reusable notification email shell.
+ */
+function notificationShell(title, bodyContent) {
+  return `
+  <div style="font-family:Inter,Arial,sans-serif;max-width:520px;margin:0 auto;
+              padding:36px 32px;background:#ffffff;border-radius:14px;
+              border:1px solid #e5e7f0;box-shadow:0 4px 20px rgba(0,0,0,0.04)">
+    <div style="border-bottom:1px solid #f0f0f5;padding-bottom:16px;margin-bottom:24px">
+      <p style="margin:0;font-size:20px;font-weight:700;color:#F5A623">
+        Planning Center
+      </p>
+      <p style="margin:4px 0 0;font-size:13px;color:#8888a0">
+        Event Registration &amp; Management
+      </p>
+    </div>
+    <h2 style="margin:0 0 16px;font-size:18px;font-weight:700;color:#1a1a2e">
+      ${title}
+    </h2>
+    ${bodyContent}
+    <div style="border-top:1px solid #f0f0f5;margin-top:28px;padding-top:16px">
+      <p style="margin:0;font-size:12px;color:#a0a0b8">
+        You received this email because you have notifications enabled in your Planning Center account.
+        <br>To update your preferences, visit your <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard" style="color:#F5A623">dashboard settings</a>.
+      </p>
+    </div>
+  </div>`;
+}
+
+/**
+ * Send an event reminder notification.
+ */
+async function sendEventReminderEmail(to, { eventTitle, eventDate, eventTime, eventLocation, ticketCode }) {
+  const body = `
+    <div style="background:#f7f8fc;border-radius:10px;padding:20px;margin:0 0 16px">
+      <p style="margin:0 0 12px;font-size:15px;font-weight:600;color:#1a1a2e">${eventTitle}</p>
+      <table style="font-size:13px;color:#555;border-collapse:collapse">
+        <tr><td style="padding:3px 12px 3px 0;color:#8888a0">Date</td><td style="padding:3px 0;font-weight:500">${eventDate}</td></tr>
+        ${eventTime ? `<tr><td style="padding:3px 12px 3px 0;color:#8888a0">Time</td><td style="padding:3px 0;font-weight:500">${eventTime}</td></tr>` : ''}
+        <tr><td style="padding:3px 12px 3px 0;color:#8888a0">Location</td><td style="padding:3px 0;font-weight:500">${eventLocation}</td></tr>
+        <tr><td style="padding:3px 12px 3px 0;color:#8888a0">Ticket</td><td style="padding:3px 0;font-weight:500">${ticketCode || 'N/A'}</td></tr>
+      </table>
+    </div>
+    <p style="font-size:14px;color:#555;margin:0 0 8px">Don't forget to bring your QR ticket for check-in. You can view it in your dashboard.</p>
+  `;
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM || `"Planning Center" <${process.env.SMTP_USER}>`,
+    to,
+    subject: `📅 Reminder: ${eventTitle} is coming up!`,
+    html: notificationShell('Event Reminder', body),
+  });
+}
+
+/**
+ * Send a refund status update notification.
+ */
+async function sendRefundUpdateEmail(to, { eventName, ticketCode, status, reason }) {
+  const statusColors = { pending: '#F59E0B', approved: '#10B981', rejected: '#EF4444' };
+  const color = statusColors[status] || '#8888a0';
+  const body = `
+    <div style="background:#f7f8fc;border-radius:10px;padding:20px;margin:0 0 16px;text-align:center">
+      <div style="font-size:40px;margin-bottom:10px">
+        ${status === 'approved' ? '✅' : status === 'rejected' ? '❌' : '⏳'}
+      </div>
+      <p style="margin:0 0 4px;font-size:16px;font-weight:700;color:${color};text-transform:uppercase">${status}</p>
+      <p style="margin:0;font-size:13px;color:#8888a0">Refund for <strong>${eventName}</strong></p>
+      ${reason ? `<p style="margin:8px 0 0;font-size:12px;color:#8888a0">Reason: ${reason}</p>` : ''}
+      ${ticketCode ? `<p style="margin:4px 0 0;font-size:12px;color:#8888a0">Ticket: ${ticketCode}</p>` : ''}
+    </div>
+  `;
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM || `"Planning Center" <${process.env.SMTP_USER}>`,
+    to,
+    subject: `Refund ${status}: ${eventName}`,
+    html: notificationShell('Refund Update', body),
+  });
+}
+
+/**
+ * Send a promotional / marketing email.
+ */
+async function sendPromotionalEmail(to, { title, message, ctaText, ctaLink }) {
+  const body = `
+    <p style="font-size:14px;color:#555;line-height:1.7;margin:0 0 20px">${message}</p>
+    ${ctaText && ctaLink ? `
+      <a href="${ctaLink}" style="display:inline-block;background:linear-gradient(135deg,#F5A623,#FB6F4C);
+         color:#fff;text-decoration:none;padding:12px 28px;border-radius:10px;
+         font-size:14px;font-weight:600;margin:0 0 16px">${ctaText}</a>
+    ` : ''}
+  `;
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM || `"Planning Center" <${process.env.SMTP_USER}>`,
+    to,
+    subject: title,
+    html: notificationShell(title, body),
+  });
+}
+
+/**
+ * Send a test/diagnostic email to verify SMTP is working.
+ */
+async function sendTestEmail(to) {
+  const body = `
+    <p style="font-size:14px;color:#555;line-height:1.7;margin:0">
+      This is a test notification from Planning Center. If you received this email,
+      your notification settings are working correctly!
+    </p>
+  `;
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM || `"Planning Center" <${process.env.SMTP_USER}>`,
+    to,
+    subject: '✅ Test notification from Planning Center',
+    html: notificationShell('Test Notification', body),
+  });
+}
+
+/**
+ * Send an event approval / rejection notification to the organizer.
+ */
+async function sendEventApprovalEmail(to, { eventTitle, status }) {
+  const isApproved = status === "approved";
+  const icon = isApproved ? "✅" : "❌";
+  const color = isApproved ? "#10B981" : "#EF4444";
+  const statusLabel = isApproved ? "APPROVED" : "REJECTED";
+  const body = `
+    <div style="background:#f7f8fc;border-radius:10px;padding:20px;margin:0 0 16px;text-align:center">
+      <div style="font-size:40px;margin-bottom:10px">${icon}</div>
+      <p style="margin:0 0 4px;font-size:16px;font-weight:700;color:${color};text-transform:uppercase">${statusLabel}</p>
+      <p style="margin:0;font-size:14px;color:#555">
+        Your event <strong>${eventTitle}</strong> has been ${status}.
+      </p>
+      ${isApproved ? `
+        <p style="margin:12px 0 0;font-size:13px;color:#8888a0">
+          The event is now live and visible to attendees on the platform.
+        </p>
+      ` : `
+        <p style="margin:12px 0 0;font-size:13px;color:#8888a0">
+          You may review the feedback and resubmit after making changes.
+        </p>
+      `}
+    </div>
+  `;
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM || `"Planning Center" <${process.env.SMTP_USER}>`,
+    to,
+    subject: `${icon} Event ${statusLabel}: ${eventTitle}`,
+    html: notificationShell(`Event ${statusLabel}`, body),
+  });
+}
+
+module.exports = { sendOtpEmail, sendEventReminderEmail, sendRefundUpdateEmail, sendPromotionalEmail, sendTestEmail, sendEventApprovalEmail, transporter };

@@ -17,6 +17,7 @@ const CreateEventPage       = lazy(() => import('../pages/CreateEventPage/Create
 const ForgotPasswordPage    = lazy(() => import('../pages/ForgotPasswordPage/ForgotPasswordPage.jsx'));
 const PrivacyPolicyPage     = lazy(() => import('../pages/PrivacyPolicyPage/PrivacyPolicyPage.jsx'));
 const TermsPage             = lazy(() => import('../pages/TermsPage/TermsPage.jsx'));
+const BookmarksPage         = lazy(() => import('../pages/BookmarksPage/BookmarksPage.jsx'));
 const NotFound              = lazy(() => import('../pages/NotFoundPage/NotFoundPage.jsx'));
 
 // ── Route guards ───────────────────────────────────────────────────────────
@@ -100,6 +101,13 @@ export default function AppRoutes() {
         <Route path="/ticket/:code" element={
           <PrivateRoute roles={['Attendee', 'Admin', 'Organizer', 'Supervisor']}>
             <TicketPage />
+          </PrivateRoute>
+        } />
+
+        {/* Bookmarks page */}
+        <Route path="/bookmarks" element={
+          <PrivateRoute roles={['Attendee', 'Admin', 'Organizer', 'Supervisor']}>
+            <BookmarksPage />
           </PrivateRoute>
         } />
 

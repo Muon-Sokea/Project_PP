@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { apiRegister, apiVerifyEmail, apiResendOtp } from '../../services/auth.service.js';
+import { GoogleLogin } from '@react-oauth/google';
+import { apiRegister, apiVerifyEmail, apiResendOtp, apiGoogleLogin, apiTelegramLogin } from '../../services/auth.service.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import '../../../assets/css/9_auth-gm.css';
 import './RegisterPage.css';
@@ -11,6 +12,8 @@ const ROLE_ROUTES = {
   Organizer:  '/organizer',
   Attendee:   '/dashboard',
 };
+
+const TELEGRAM_BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || '';
 
 const emailRe  = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const phoneOk  = (v) => {
@@ -271,6 +274,61 @@ export default function RegisterPage() {
     alert(`${name} sign-up is coming soon!`);
   }
 
+  // ── Google / Telegram sign-up ─────────────────────────────────────────────
+  const [socialError, setSocialError] = useState('');
+  const telegramContainerRef = useRef(null);
+
+  function goToRoleHome() {
+    const role = localStorage.getItem('erms_role');
+    navigate(ROLE_ROUTES[role] || '/', { replace: true });
+  }
+
+  async function handleGoogleSuccess(credentialResponse) {
+    setSocialError('');
+    try {
+      await apiGoogleLogin(credentialResponse.credential);
+      syncSession();
+      launchConfetti();
+      setTimeout(goToRoleHome, 800);
+    } catch (err) {
+      setSocialError(err.message || String(err));
+    }
+  }
+
+  async function handleTelegramAuth(telegramUser) {
+    setSocialError('');
+    try {
+      await apiTelegramLogin(telegramUser);
+      syncSession();
+      launchConfetti();
+      setTimeout(goToRoleHome, 800);
+    } catch (err) {
+      setSocialError(err.message || String(err));
+    }
+  }
+
+  useEffect(() => {
+    if (!TELEGRAM_BOT_USERNAME || !telegramContainerRef.current) return;
+
+    window.onTelegramAuth = handleTelegramAuth;
+
+    const script = document.createElement('script');
+    script.src = 'https://telegram.org/js/telegram-widget.js?22';
+    script.async = true;
+    script.setAttribute('data-telegram-login', TELEGRAM_BOT_USERNAME);
+    script.setAttribute('data-size', 'large');
+    script.setAttribute('data-radius', '8');
+    script.setAttribute('data-onauth', 'onTelegramAuth(user)');
+    script.setAttribute('data-request-access', 'write');
+    telegramContainerRef.current.appendChild(script);
+
+    return () => {
+      delete window.onTelegramAuth;
+      if (telegramContainerRef.current) telegramContainerRef.current.innerHTML = '';
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── render ────────────────────────────────────────────────────────────────
   return (
     <>
@@ -407,29 +465,29 @@ export default function RegisterPage() {
 
             <div className="divider-or"><span>or sign up with</span></div>
 
+            {socialError && <div className="field-error" role="alert" style={{ textAlign: 'center', marginBottom: 12 }}>{socialError}</div>}
+
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => setSocialError('Google sign-up failed. Please try again.')}
+                theme="outline"
+                size="large"
+                shape="rectangular"
+                text="signup_with"
+                width="280"
+              />
+            </div>
+
+            {TELEGRAM_BOT_USERNAME && (
+              <div ref={telegramContainerRef} style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }} />
+            )}
+
             <div className="social-row">
-              <button className="social-btn" aria-label="Sign up with Google"
-                onClick={() => socialComingSoon('Google')}>
-                <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true">
-                  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                  <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                  <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                  <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-                </svg>
-                Google
-              </button>
               <button className="social-btn" aria-label="Sign up with Facebook"
                 onClick={() => socialComingSoon('Facebook')}>
                 <i className="ri-facebook-fill" style={{ color: '#1877F2', fontSize: 18 }} aria-hidden="true" />
                 Facebook
-              </button>
-              <button className="social-btn" aria-label="Sign up with Telegram"
-                onClick={() => socialComingSoon('Telegram')}>
-                <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true">
-                  <circle cx="24" cy="24" r="24" fill="#2AABEE"/>
-                  <path fill="#fff" d="M35.5 13.3L8.9 23.6c-1.5.6-1.5 1.4-.3 1.8l6.7 2.1 15.5-9.8c.7-.4 1.4-.2.9.3L18.2 29.2l-.6 7c.8 0 1.2-.4 1.6-.8l3.8-3.7 7 5.2c1.3.7 2.2.3 2.5-1.2l4.5-21.2c.5-1.9-.7-2.8-1.5-2.2z"/>
-                </svg>
-                Telegram
               </button>
             </div>
 

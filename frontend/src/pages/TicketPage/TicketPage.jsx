@@ -87,8 +87,21 @@ export default function TicketPage() {
         useCORS: true,
         allowTaint: true,
         logging: false,
-        backgroundColor: '#1a1a2e',
-        ignoreElements: el => el.classList.contains('ticket-actions'),
+        backgroundColor: '#ffffff',
+        onclone: (clonedDoc) => {
+          // Remove action buttons from cloned document so they don't render
+          const actions = clonedDoc.querySelector('.ticket-actions');
+          if (actions) actions.remove();
+          // Ensure cloned card has explicit white background
+          const clonedCard = clonedDoc.querySelector('.ticket-card');
+          if (clonedCard) clonedCard.style.background = '#ffffff';
+          // Ensure detail sections have white background
+          const details = clonedDoc.querySelector('.ticket-details');
+          if (details) details.style.background = '#ffffff';
+          // Ensure QR section background is explicitly white
+          const qrSection = clonedDoc.querySelector('.ticket-qr-section');
+          if (qrSection) qrSection.style.background = '#ffffff';
+        },
       });
 
       const imgData = canvas.toDataURL('image/png');
@@ -104,8 +117,8 @@ export default function TicketPage() {
       }
       const offsetY = Math.max(10, (pageH - drawH) / 2);
 
-      // Dark background for the whole page
-      pdf.setFillColor(26, 26, 46);
+      // White background for the whole page (matches web ticket)
+      pdf.setFillColor(255, 255, 255);
       pdf.rect(0, 0, pageW, pageH, 'F');
 
       pdf.addImage(imgData, 'PNG', 10, offsetY, drawW, drawH);

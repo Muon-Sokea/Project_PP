@@ -27,3 +27,11 @@ export async function apiDeleteEvent(id) {
 export async function apiTogglePublish(id) {
   return http('PATCH', `/events/${id}/publish`);
 }
+
+export async function apiApproveEvent(id) {
+  return http('PATCH', `/events/${id}/approve`);
+}
+
+export async function apiRejectEvent(id) {
+  return http('PATCH', `/events/${id}/reject`);
+}

@@ -28,6 +28,18 @@ export async function apiResetPassword(userId, code, newPassword) {
   return http('POST', '/auth/reset-password', { userId, code, newPassword });
 }
 
+export async function apiGoogleLogin(idToken) {
+  const data = await http('POST', '/auth/google', { idToken });
+  _saveSession(data);
+  return data;
+}
+
+export async function apiTelegramLogin(telegramUser) {
+  const data = await http('POST', '/auth/telegram', telegramUser);
+  _saveSession(data);
+  return data;
+}
+
 export async function apiLogout() {
   await http('POST', '/auth/logout').catch(() => {});
   ['erms_user', 'erms_role', 'erms_token'].forEach(k => localStorage.removeItem(k));

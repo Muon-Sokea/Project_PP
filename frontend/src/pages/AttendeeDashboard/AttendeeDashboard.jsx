@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { apiGetEvents } from '../../services/event.service.js';
 import { apiGetMyRegistrations } from '../../services/registration.service.js';
 import { apiRequestRefund } from '../../services/refund.service.js';
 import { apiSubmitTestimonial, apiGetTestimonials } from '../../services/testimonial.service.js';
+import { apiGetNotificationPrefs, apiSaveNotificationPrefs } from '../../services/notification.service.js';
+import { apiGetBookmarks, apiUnbookmarkEvent } from '../../services/bookmark.service.js';
+import { fmtDate } from '../../utils/formatDate.js';
 import { useEscapeKey } from '../../hooks/useEscapeKey.js';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock.js';
 import DashboardNavbar from '../../components/layout/DashboardNavbar/DashboardNavbar.jsx';
@@ -118,6 +121,10 @@ export default function AttendeeDashboard() {
   const [refundReason, setRefundReason] = useState('');
   const [refundDetails, setRefundDetails] = useState('');
 
+  // Bookmarks / Saved Events
+  const [savedEvents, setSavedEvents] = useState([]);
+  const [loadingSaved, setLoadingSaved] = useState(false);
+
   // Testimonials
   const [reviewModal, setReviewModal] = useState(null);
   const [reviewRating, setReviewRating] = useState(0);
@@ -147,17 +154,23 @@ export default function AttendeeDashboard() {
   const [secShowCurr, setSecShowCurr] = useState(false);
   const [secShowNew, setSecShowNew] = useState(false);
   const [secToast, setSecToast] = useState({ msg: '', show: false });
-  const [devices, setDevices] = useState([
-    { id: 1, name: 'MacBook Pro', meta: 'macOS 14.5 · Last active now', badge: 'current', type: 'laptop' },
-    { id: 2, name: 'iPhone 14', meta: 'iOS 17.4 · Last seen 2 min ago', badge: 'recent', type: 'phone' },
-    { id: 3, name: 'iPad Air', meta: 'iPadOS 17.4 · Last seen 3 days ago', badge: 'old', type: 'tablet' },
-  ]);
+  // Real-time connected devices (detected from browser fingerprint)
+  const [devices, setDevices] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('erms_devices') || '[]'); } catch { return []; }
+  });
 
   // Profile toast
   const [profileToast, setProfileToast] = useState({ msg: '', show: false });
 
-  const uploadRef  = useRef(null);
-  const cameraRef  = useRef(null);
+  // Camera
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraStream, setCameraStream] = useState(null);
+  const [cameraError, setCameraError] = useState('');
+  const [cameraLoading, setCameraLoading] = useState(false);
+
+  const uploadRef = useRef(null);
+  const videoRef  = useRef(null);
+  const canvasRef = useRef(null);
 
   // ── Init ───────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -188,12 +201,14 @@ export default function AttendeeDashboard() {
         const today = new Date(); today.setHours(0, 0, 0, 0);
         const enriched = tickets.map(t => {
           const ev = evMap.get(String(t.eventId)) || {};
-          const evDate = ev.date ? new Date(ev.date) : null;
+          // Use the direct API event fields as primary; fall back to enriched event data
+          const eventDateStr = t.event_date || ev.date || null;
+          const evDate = eventDateStr ? new Date(eventDateStr) : null;
           return {
             title:      t.event_title || ev.title || 'Event',
-            date:       ev.date   || '—',
-            time:       ev.time   || '—',
-            location:   ev.location || '—',
+            date:       fmtDate(eventDateStr) || '—',
+            time:       t.event_time || ev.time || '—',
+            location:   t.event_location || ev.location || '—',
             price:      Number(t.unit_price || t.price || ev.price) || 0,
             status:     t.status  || 'confirmed',
             ticketCode: t.ticketCode || t.id,
@@ -219,7 +234,112 @@ export default function AttendeeDashboard() {
           setReviewedEventIds(ids);
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      // Load notification preferences from backend
+      .finally(() => {
+        apiGetNotificationPrefs()
+          .then(data => { if (data && typeof data === 'object') setNotif(prev => ({ ...prev, ...data })); })
+          .catch(() => {});
+      });
+    // Load bookmarked events
+    loadBookmarks();
+  }, []);
+
+  async function loadBookmarks() {
+    setLoadingSaved(true);
+    try {
+      const bookmarked = await apiGetBookmarks();
+      if (Array.isArray(bookmarked)) setSavedEvents(bookmarked);
+    } catch {}
+    setLoadingSaved(false);
+  }
+
+  // Refresh bookmarks when tab switches to 'saved'
+  useEffect(() => {
+    if (activeTab === 'saved') loadBookmarks();
+  }, [activeTab]);
+
+  // ── Real-time device detection ──────────────────────────────────────────
+  useEffect(() => {
+    function detectDevice() {
+      const ua = navigator.userAgent;
+      const platform = navigator.platform || '';
+      const screenW = screen.width;
+      const screenH = screen.height;
+      const lang = navigator.language;
+
+      // Generate a fingerprint from browser signals
+      const fingerprint = [
+        ua,
+        platform,
+        screenW,
+        screenH,
+        lang,
+      ].join('||');
+
+      // Simple hash
+      let hash = 0;
+      for (let i = 0; i < fingerprint.length; i++) {
+        const chr = fingerprint.charCodeAt(i);
+        hash = ((hash << 5) - hash) + chr;
+        hash |= 0;
+      }
+
+      // Detect device type
+      const isMobile = /Mobile|Android|iPhone|iPad|iPod/i.test(ua);
+      const isTablet = /iPad|Android(?!.*Mobile)/i.test(ua);
+      const deviceType = isMobile ? (isTablet ? 'tablet' : 'phone') : 'laptop';
+
+      // Detect OS
+      let os = 'Unknown OS';
+      if (/Windows NT 10/.test(ua)) os = 'Windows 10';
+      else if (/Windows NT 11/.test(ua)) os = 'Windows 11';
+      else if (/Mac OS X/.test(ua)) {
+        const m = ua.match(/Mac OS X ([\d_.]+)/);
+        os = m ? 'macOS ' + m[1].replace(/_/g, '.') : 'macOS';
+      } else if (/Android/.test(ua)) {
+        const m = ua.match(/Android ([\d.]+)/);
+        os = m ? 'Android ' + m[1] : 'Android';
+      } else if (/iPhone|iPad|iPod/.test(ua)) {
+        const m = ua.match(/OS ([\d_]+)/);
+        os = m ? 'iOS ' + m[1].replace(/_/g, '.') : 'iOS';
+      } else if (/Linux/.test(ua)) os = 'Linux';
+
+      // Detect browser
+      let browser = 'Unknown';
+      if (/Edg\//.test(ua)) browser = 'Edge';
+      else if (/Chrome\//.test(ua)) browser = 'Chrome';
+      else if (/Firefox\//.test(ua)) browser = 'Firefox';
+      else if (/Safari\//.test(ua)) browser = 'Safari';
+
+      const deviceName = [browser, os].join(' · ');
+      const now = new Date();
+      const meta = os + ' · ' + screenW + 'x' + screenH;
+
+      return { id: hash, name: deviceName, meta, type: deviceType, os, browser, fingerprint: hash, lastSeen: now.toISOString() };
+    }
+
+    const current = detectDevice();
+    try {
+      const stored = JSON.parse(localStorage.getItem('erms_devices') || '[]');
+      const existing = stored.find(d => d.id === current.id);
+      if (existing) {
+        // Update last seen
+        const updated = stored.map(d =>
+          d.id === current.id ? { ...d, lastSeen: new Date().toISOString(), meta: current.meta } : d
+        );
+        localStorage.setItem('erms_devices', JSON.stringify(updated));
+        setDevices(updated);
+      } else {
+        // Add new device
+        const updated = [...stored, current];
+        localStorage.setItem('erms_devices', JSON.stringify(updated));
+        setDevices(updated);
+      }
+    } catch {
+      // Fallback: just show current device
+      setDevices([current]);
+    }
   }, []);
 
   // Escape key
@@ -229,7 +349,7 @@ export default function AttendeeDashboard() {
   });
 
   // Body overflow lock
-  useBodyScrollLock(profileOpen || photoOpen || refundModal || !!secModal);
+  useBodyScrollLock(profileOpen || photoOpen || cameraOpen || refundModal || !!secModal);
 
   // ── Review helpers ────────────────────────────────────────────────────────
   function showReviewToast(msg) {
@@ -265,6 +385,71 @@ export default function AttendeeDashboard() {
     setProfileToast({ msg, show: true });
     setTimeout(() => setProfileToast(t => ({ ...t, show: false })), 1800);
   }
+
+  // ── Camera (getUserMedia) ────────────────────────────────────────────────
+  async function startCamera() {
+    setCameraError('');
+    setCameraLoading(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false,
+      });
+      setCameraStream(stream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+      setCameraOpen(true);
+    } catch (err) {
+      console.error('Camera access denied:', err);
+      setCameraError(
+        err.name === 'NotAllowedError'
+          ? 'Camera access was denied. Please allow camera permissions in your browser settings.'
+          : err.name === 'NotFoundError'
+            ? 'No camera found on this device.'
+            : 'Could not open camera: ' + err.message
+      );
+    } finally {
+      setCameraLoading(false);
+    }
+  }
+
+  function stopCamera() {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
+    }
+    setCameraOpen(false);
+    setCameraError('');
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }
+
+  function capturePhoto() {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    // Mirror the image horizontally (front camera is mirrored)
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+    stopCamera();
+    applyPhoto(`<img src="${dataUrl}" alt="Profile picture">`);
+  }
+
+  // Cleanup camera on unmount
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [cameraStream]);
 
   // ── Profile photo ─────────────────────────────────────────────────────────
   function applyPhoto(markup, idx) {
@@ -359,12 +544,14 @@ export default function AttendeeDashboard() {
 
   function removeDevice(id) {
     const dev = devices.find(d => d.id === id);
-    setDevices(ds => ds.filter(d => d.id !== id));
-    showSecToast((dev?.name || 'Device') + ' removed');
+    const updated = devices.filter(d => d.id !== id);
+    setDevices(updated);
+    try { localStorage.setItem('erms_devices', JSON.stringify(updated)); } catch {}
+    showSecToast(`${dev?.name || 'Device'} removed`);
   }
 
   // ── Derived ───────────────────────────────────────────────────────────────
-  const events    = activeTab === 'past' ? registrations.past : registrations.upcoming;
+  const events    = activeTab === 'past' ? registrations.past : (activeTab === 'saved' ? savedEvents : registrations.upcoming);
   const allEvents = [...registrations.upcoming, ...registrations.past];
   const totalSpent = allEvents.reduce((s, e) => s + (e.price || 0), 0);
 
@@ -439,13 +626,19 @@ export default function AttendeeDashboard() {
               className={`tab-filter-btn${activeTab === 'upcoming' ? ' active' : ''}`}
               onClick={() => setActiveTab('upcoming')}
             >
-              Upcoming Events ({registrations.upcoming.length})
+              Upcoming ({registrations.upcoming.length})
             </button>
             <button
               className={`tab-filter-btn${activeTab === 'past' ? ' active' : ''}`}
               onClick={() => setActiveTab('past')}
             >
-              Past Events ({registrations.past.length})
+              Past ({registrations.past.length})
+            </button>
+            <button
+              className={`tab-filter-btn${activeTab === 'saved' ? ' active' : ''}`}
+              onClick={() => setActiveTab('saved')}
+            >
+              <i className="ri-bookmark-line" /> Saved ({savedEvents.length})
             </button>
           </div>
 
@@ -476,6 +669,66 @@ export default function AttendeeDashboard() {
                 </div>
               ))}
             </>
+          ) : activeTab === 'saved' ? (
+            loadingSaved ? (
+              <div style={{ textAlign: 'center', padding: 32 }}><div className="spinner" /></div>
+            ) : savedEvents.length === 0 ? (
+              <div className="empty-state">
+                <i className="ri-bookmark-line" style={{ fontSize: 40, color: 'var(--text-light)', marginBottom: 12, display: 'block' }} />
+                <p>No saved events yet.</p>
+                <Link to="/events" className="btn btn-outline" style={{ marginTop: 12 }}>
+                  <i className="ri-search-line" /> Browse Events
+                </Link>
+              </div>
+            ) : (
+              savedEvents.map((ev) => {
+                const eventDate = ev.date ? fmtDate(ev.date) : '—';
+                return (
+                  <div className="event-list-item" key={ev.id}>
+                    <div className="event-list-img">
+                      <img
+                        src={ev.image || '/images/Tech1.jpg'}
+                        alt={ev.title}
+                        onError={e => { e.currentTarget.src = '/images/Tech1.jpg'; }}
+                      />
+                      <span className="price-tag">{Number(ev.price) === 0 ? 'Free' : `$${Number(ev.price)}`}</span>
+                    </div>
+                    <div className="event-list-info">
+                      <div className="event-list-header">
+                        <span className="badge badge-available">{ev.category || 'General'}</span>
+                        <span style={{ fontSize: 12, color: 'var(--text-light)' }}>
+                          <i className="ri-bookmark-fill" style={{ color: 'var(--primary)' }} /> Saved
+                        </span>
+                      </div>
+                      <h3>{ev.title}</h3>
+                      <div className="event-meta">
+                        <div className="event-meta-item"><i className="ri-calendar-line" /> {eventDate}</div>
+                        {ev.location && <div className="event-meta-item"><i className="ri-map-pin-line" /> {ev.location}</div>}
+                      </div>
+                      <div className="event-list-actions">
+                        <button className="btn btn-primary btn-sm" onClick={() => {
+                          localStorage.setItem('erms_selected_event', JSON.stringify(ev));
+                          navigate(`/events/${ev.id}`);
+                        }}>
+                          <i className="ri-eye-line" /> View Event
+                        </button>
+                        <button className="btn btn-outline btn-sm" onClick={async () => {
+                          try {
+                            await apiUnbookmarkEvent(ev.id);
+                            setSavedEvents(prev => prev.filter(e => e.id !== ev.id));
+                          } catch {}
+                          const localList = (() => { try { return JSON.parse(localStorage.getItem('erms_saved_events') || '[]'); } catch { return []; } })();
+                          localStorage.setItem('erms_saved_events', JSON.stringify(localList.filter(i => i !== ev.id)));
+                          window.dispatchEvent(new CustomEvent('erms:bookmarks-updated'));
+                        }}>
+                          <i className="ri-bookmark-fill" /> Unsave
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )
           ) : events.length === 0 ? (
             <div className="empty-state"><p>No {activeTab} events found.</p></div>
           ) : (
@@ -674,21 +927,45 @@ export default function AttendeeDashboard() {
               </div>
 
               <div className="sec-devices">
-                <h4>Connected Devices</h4>
+                <h4>Connected Devices ({(devices || []).length})</h4>
                 <div className="sec-dev-list">
-                  {devices.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: 28, color: 'var(--text-light)', fontSize: 13 }}>No devices connected</div>
-                  ) : devices.map(d => (
-                    <div className={`sec-dev-item${d.badge === 'current' ? ' current' : ''}`} key={d.id}>
-                      <div className="sec-dev-icon"><DeviceIcon type={d.type} /></div>
-                      <div className="sec-dev-info">
-                        <div className="sec-dev-name">{d.name}</div>
-                        <div className="sec-dev-meta">{d.meta}</div>
-                      </div>
-                      <span className={`sec-dev-badge ${d.badge}`}>{d.badge === 'old' ? 'Inactive' : d.badge.charAt(0).toUpperCase() + d.badge.slice(1)}</span>
-                      <button className="sec-dev-remove" onClick={() => removeDevice(d.id)}>Remove</button>
-                    </div>
-                  ))}
+                  {(!devices || devices.length === 0) ? (
+                    <div style={{ textAlign: 'center', padding: 28, color: 'var(--text-light)', fontSize: 13 }}>No devices detected yet</div>
+                  ) : (
+                    [...devices]
+                      .sort((a, b) => new Date(b.lastSeen) - new Date(a.lastSeen))
+                      .map((d, idx) => {
+                        const isCurrent = idx === 0;
+                        const lastSeen = new Date(d.lastSeen);
+                        const now = new Date();
+                        const diffMs = now - lastSeen;
+                        const diffMin = Math.floor(diffMs / 60000);
+                        const diffHr  = Math.floor(diffMs / 3600000);
+                        const diffDay = Math.floor(diffMs / 86400000);
+                        let timeAgo;
+                        if (diffMin < 1) timeAgo = 'just now';
+                        else if (diffMin < 60) timeAgo = diffMin + 'm ago';
+                        else if (diffHr < 24) timeAgo = diffHr + 'h ago';
+                        else if (diffDay < 7) timeAgo = diffDay + 'd ago';
+                        else timeAgo = lastSeen.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                        return (
+                          <div className={`sec-dev-item${isCurrent ? ' current' : ''}`} key={d.id}>
+                            <div className="sec-dev-icon"><DeviceIcon type={d.type || 'laptop'} /></div>
+                            <div className="sec-dev-info">
+                              <div className="sec-dev-name">
+                                {d.name}
+                                {isCurrent && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Current</span>}
+                              </div>
+                              <div className="sec-dev-meta">{d.meta} · {timeAgo}</div>
+                            </div>
+                            <span className={`sec-dev-badge ${isCurrent ? 'current' : 'old'}`}>
+                              {isCurrent ? 'Active' : lastSeen.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </span>
+                            <button className="sec-dev-remove" onClick={() => removeDevice(d.id)}>Remove</button>
+                          </div>
+                        );
+                      })
+                  )}
                 </div>
               </div>
             </div>
@@ -713,7 +990,14 @@ export default function AttendeeDashboard() {
                   />
                 </div>
               ))}
-              <button className="btn btn-primary btn-full" style={{ marginTop: 16 }} onClick={() => alert('Notification preferences saved!')}>
+              <button className="btn btn-primary btn-full" style={{ marginTop: 16 }} onClick={async () => {
+                try {
+                  await apiSaveNotificationPrefs(notif);
+                  showProfileToast('Notification preferences saved');
+                } catch {
+                  showProfileToast('Failed to save preferences');
+                }
+              }}>
                 <i className="ri-save-line" /> Save Preferences
               </button>
             </div>
@@ -799,15 +1083,64 @@ export default function AttendeeDashboard() {
             <button className="photo-action-btn" type="button" onClick={() => uploadRef.current?.click()}>
               <i className="ri-upload-cloud-2-line" /> Upload from Device
             </button>
-            <button className="photo-action-btn" type="button" onClick={() => cameraRef.current?.click()}>
+            <button className="photo-action-btn" type="button" onClick={startCamera}>
               <i className="ri-camera-3-line" /> Take a picture
             </button>
             <input ref={uploadRef} className="photo-input" type="file" accept="image/*"
               onChange={e => handleFileUpload(e.target.files[0])} />
-            <input ref={cameraRef} className="photo-input" type="file" accept="image/*" capture="user"
-              onChange={e => handleFileUpload(e.target.files[0])} />
           </div>
         </section>
+      </div>
+
+      {/* ══ Camera Modal ══ */}
+      <div
+        className={`camera-overlay${cameraOpen || cameraLoading || cameraError ? ' open' : ''}`}
+        onClick={e => { if (e.target === e.currentTarget) stopCamera(); }}
+      >
+        <div className="camera-modal">
+          <div className="camera-header">
+            <button className="photo-icon-btn" type="button" onClick={stopCamera} aria-label="Close">
+              <i className="ri-close-line" />
+            </button>
+            <div className="photo-modal-title">Take a picture</div>
+            <div style={{ width: 38 }} />
+          </div>
+
+          <div className="camera-viewfinder">
+            {cameraLoading && (
+              <div className="camera-loading">
+                <i className="ri-loader-4-line ri-spin" style={{ fontSize: 32, marginBottom: 12 }} />
+                <p>Opening camera...</p>
+              </div>
+            )}
+            {cameraError && (
+              <div className="camera-error">
+                <i className="ri-camera-off-line" style={{ fontSize: 36, marginBottom: 12, opacity: 0.6 }} />
+                <p>{cameraError}</p>
+                <button className="btn btn-outline btn-sm" style={{ marginTop: 16 }} onClick={() => { setCameraError(''); startCamera(); }}>
+                  <i className="ri-refresh-line" /> Try again
+                </button>
+              </div>
+            )}
+            <video
+              ref={videoRef}
+              className="camera-video"
+              autoPlay
+              playsInline
+              muted
+              style={{ display: cameraStream && !cameraError ? 'block' : 'none' }}
+            />
+            <canvas ref={canvasRef} style={{ display: 'none' }} />
+          </div>
+
+          {cameraStream && !cameraError && (
+            <div className="camera-footer">
+              <button className="camera-capture-btn" type="button" onClick={capturePhoto} aria-label="Capture photo">
+                <div className="camera-capture-ring" />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Profile toast */}

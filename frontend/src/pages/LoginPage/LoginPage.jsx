@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { apiLogin } from '../../services/auth.service.js';
+import { GoogleLogin } from '@react-oauth/google';
+import { apiLogin, apiGoogleLogin, apiTelegramLogin } from '../../services/auth.service.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import '../../../assets/css/9_auth-gm.css';
 import './LoginPage.css';
 
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const TELEGRAM_BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || '';
 
 function shake(fieldEl) {
   if (!fieldEl) return;
@@ -17,6 +19,63 @@ function shake(fieldEl) {
 export default function LoginPage() {
   const navigate     = useNavigate();
   const { syncSession } = useAuth();
+
+  // ── Google Sign-In handler ───────────────────────────────────────────────
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  async function handleGoogleSuccess(credentialResponse) {
+    if (googleLoading || success) return;
+    setGoogleLoading(true);
+    try {
+      const data = await apiGoogleLogin(credentialResponse.credential);
+      syncSession();
+      setSuccess(true);
+      setTimeout(() => navigate('/'), 650);
+    } catch (err) {
+      const msg = err.message || String(err);
+      setErrors({ email: `Google sign-in failed: ${msg}` });
+    } finally {
+      setGoogleLoading(false);
+    }
+  }
+
+  // ── Telegram Sign-In handler ─────────────────────────────────────────────
+  const telegramContainerRef = useRef(null);
+
+  async function handleTelegramAuth(telegramUser) {
+    if (success) return;
+    try {
+      await apiTelegramLogin(telegramUser);
+      syncSession();
+      setSuccess(true);
+      setTimeout(() => navigate('/'), 650);
+    } catch (err) {
+      const msg = err.message || String(err);
+      setErrors({ email: `Telegram sign-in failed: ${msg}` });
+    }
+  }
+
+  useEffect(() => {
+    if (!TELEGRAM_BOT_USERNAME || !telegramContainerRef.current) return;
+
+    window.onTelegramAuth = handleTelegramAuth;
+
+    const script = document.createElement('script');
+    script.src = 'https://telegram.org/js/telegram-widget.js?22';
+    script.async = true;
+    script.setAttribute('data-telegram-login', TELEGRAM_BOT_USERNAME);
+    script.setAttribute('data-size', 'large');
+    script.setAttribute('data-radius', '8');
+    script.setAttribute('data-onauth', 'onTelegramAuth(user)');
+    script.setAttribute('data-request-access', 'write');
+    telegramContainerRef.current.appendChild(script);
+
+    return () => {
+      delete window.onTelegramAuth;
+      if (telegramContainerRef.current) telegramContainerRef.current.innerHTML = '';
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
@@ -186,6 +245,29 @@ export default function LoginPage() {
               <span className="check" aria-hidden="true"><i className="ri-check-line" /></span>
             </button>
           </form>
+
+          {/* Divider */}
+          <div className="divider-or">
+            <span>or continue with</span>
+          </div>
+
+          {/* Google Sign-In */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => setErrors({ email: 'Google sign-in failed. Please try again.' })}
+              theme="outline"
+              size="large"
+              shape="rectangular"
+              text="signin_with"
+              width="280"
+            />
+          </div>
+
+          {/* Telegram Sign-In */}
+          {TELEGRAM_BOT_USERNAME && (
+            <div ref={telegramContainerRef} style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }} />
+          )}
 
           <p className="foot">
             Don't have an account? <Link to="/register">Sign up</Link>

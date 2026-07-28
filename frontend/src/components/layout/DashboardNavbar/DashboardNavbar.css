@@ -29,10 +29,131 @@
   transform: scale(0.92) rotate(20deg);
 }
 
+/* ── Nav icon active state (bookmark button on /bookmarks page) ── */
+.nav-icon-btn.active {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
 @media (max-width: 768px) {
   .dark-mode-toggle {
     width: 32px;
     height: 32px;
     font-size: 16px;
+  }
+}
+
+/* ── Notification bell + dropdown ─────────────────────────────────────────── */
+.notification-bell {
+  position: relative;
+}
+
+.notification-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 320px;
+  max-width: 90vw;
+  background: var(--bg-white);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.notification-dropdown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.notification-mark-all {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.notification-mark-all:hover {
+  text-decoration: underline;
+}
+
+.notification-dropdown-list {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.notification-empty {
+  padding: 24px 14px;
+  text-align: center;
+  color: var(--text-medium);
+  font-size: 13.5px;
+}
+
+.notification-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.notification-item:last-child {
+  border-bottom: none;
+}
+
+.notification-item:hover {
+  background: var(--primary-light);
+}
+
+.notification-item.unread {
+  background: rgba(var(--primary-rgb, 37, 99, 235), 0.06);
+}
+
+.notification-item.unread .notification-item-title::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--primary);
+  margin-right: 6px;
+}
+
+.notification-item-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.notification-item-message {
+  font-size: 12.5px;
+  color: var(--text-medium);
+  margin-top: 2px;
+}
+
+.notification-item-time {
+  font-size: 11px;
+  color: var(--text-medium);
+  margin-top: 4px;
+}
+
+@media (max-width: 768px) {
+  .notification-dropdown {
+    width: 280px;
   }
 }

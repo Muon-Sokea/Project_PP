@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiGetEvents } from '../../services/event.service.js';
 import { apiGetTestimonials } from '../../services/testimonial.service.js';
+import { apiGetBookmarks, apiBookmarkEvent, apiUnbookmarkEvent } from '../../services/bookmark.service.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useScrollListener } from '../../hooks/useScrollListener.js';
 import { fmtDate } from '../../utils/formatDate.js';
@@ -92,7 +93,7 @@ function TestiCard({ r, isClone }) {
 }
 
 // ── EventCard ─────────────────────────────────────────────────────────────────
-function EventCard({ event, index, onClick }) {
+function EventCard({ event, index, onClick, onBookmark, isBookmarked }) {
   const status = getStatus(event.attending ?? 0, event.capacity ?? 1);
   const delay  = Math.min(index * 0.05, 0.6);
   return (
@@ -110,6 +111,14 @@ function EventCard({ event, index, onClick }) {
           alt={event.title}
           onError={e => { e.target.src = '/images/Tech1.jpg'; e.target.onerror = null; }}
         />
+        <button
+          className={`bookmark-btn${isBookmarked ? ' saved' : ''}`}
+          onClick={e => onBookmark(e, event.id)}
+          aria-label={isBookmarked ? 'Remove from bookmarks' : 'Add to bookmarks'}
+          title={isBookmarked ? 'Remove from bookmarks' : 'Add to bookmarks'}
+        >
+          <i className={`${isBookmarked ? 'ri-bookmark-fill' : 'ri-bookmark-line'}`} />
+        </button>
         <span className={`badge ${status === 'Full' ? 'badge-full' : 'badge-available'}`}>
           {status}
         </span>
@@ -162,6 +171,14 @@ export default function EventsPage() {
   const [satisfactionRate, setSatisfactionRate] = useState(0);
   const [testimonials,  setTestimonials]  = useState([]);
 
+  // bookmarks
+  const [bookmarkedIds, setBookmarkedIds] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('erms_saved_events') || '[]')); } catch { return new Set(); }
+  });
+  const [bookmarkCount, setBookmarkCount] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('erms_saved_events') || '[]').length; } catch { return 0; }
+  });
+
   // filters / pagination
   const [category,      setCategory]      = useState('All');
   const [search,        setSearch]        = useState('');
@@ -185,13 +202,14 @@ export default function EventsPage() {
   const [suggOpen,     setSuggOpen]     = useState(false);
   const searchRef = useRef(null);
 
-  // ── Load events ────────────────────────────────────────────────────────────
+  // ── Load events + store for bookmark fallback ───────────────────────────
   function fetchEvents() {
     return apiGetEvents()
       .then(data => {
         const list = Array.isArray(data) ? data : [];
         setEvents(list);
-        setTotalAttendees(list.reduce((s, e) => s + (Number(e.attending) || Number(e.capacity) || 0), 0));
+        // Use actual attending count, NOT capacity as fallback (was inflating numbers)
+        setTotalAttendees(list.reduce((s, e) => s + (Number(e.attending) || 0), 0));
       })
       .catch(() => setEvents([]));
   }
@@ -222,6 +240,71 @@ export default function EventsPage() {
       .catch(() => {})
       .finally(() => setLoadingEvents(false));
   }, []);
+
+  // ── Load bookmarks (merge API + localStorage so mock events persist) ─────
+  useEffect(() => {
+    async function loadBookmarks() {
+      const bookmarked = await apiGetBookmarks();
+      const localIds = (() => { try { return JSON.parse(localStorage.getItem('erms_saved_events') || '[]'); } catch { return []; } })();
+      const mergedIds = new Set([
+        ...localIds,
+        ...(Array.isArray(bookmarked) ? bookmarked.map(e => e.id) : []),
+      ]);
+      setBookmarkedIds(mergedIds);
+      setBookmarkCount(mergedIds.size);
+    }
+    if (user) loadBookmarks();
+  }, [user]);
+
+  // ── Toggle bookmark (local-first: always persist locally, sync API in bg) ─
+  async function handleToggleBookmark(e, eventId) {
+    e.stopPropagation();
+    if (!user) { navigate('/login'); return; }
+    const isSaved = bookmarkedIds.has(eventId);
+    const newSet = new Set(bookmarkedIds);
+    const localList = (() => { try { return JSON.parse(localStorage.getItem('erms_saved_events') || '[]'); } catch { return []; } })();
+
+    if (isSaved) {
+      newSet.delete(eventId);
+      setBookmarkedIds(newSet);
+      setBookmarkCount(newSet.size);
+      localStorage.setItem('erms_saved_events', JSON.stringify(localList.filter(i => i !== eventId)));
+      removeBookmarkDetail(eventId);
+      // Try API silently — don't revert local state on failure
+      try { await apiUnbookmarkEvent(eventId); } catch {}
+    } else {
+      newSet.add(eventId);
+      setBookmarkedIds(newSet);
+      setBookmarkCount(newSet.size);
+      if (!localList.includes(eventId)) {
+        localList.push(eventId);
+        localStorage.setItem('erms_saved_events', JSON.stringify(localList));
+      }
+      // Store full event detail for bookmarks page (always, regardless of API)
+      const ev = events.find(e => e.id === eventId);
+      if (ev) storeBookmarkDetail(ev);
+      // Try API silently — don't revert local state on failure
+      try { await apiBookmarkEvent(eventId); } catch {}
+    }
+    window.dispatchEvent(new CustomEvent('erms:bookmarks-updated'));
+  }
+
+  // ── Bookmark detail cache helpers ─────────────────────────────────────────
+  function storeBookmarkDetail(ev) {
+    try {
+      const stored = JSON.parse(localStorage.getItem('erms_saved_events_detail') || '[]');
+      if (!stored.some(s => s.id === ev.id)) {
+        stored.push(ev);
+        localStorage.setItem('erms_saved_events_detail', JSON.stringify(stored));
+      }
+    } catch {}
+  }
+  function removeBookmarkDetail(eventId) {
+    try {
+      const stored = JSON.parse(localStorage.getItem('erms_saved_events_detail') || '[]');
+      localStorage.setItem('erms_saved_events_detail', JSON.stringify(stored.filter(s => s.id !== eventId)));
+    } catch {}
+  }
 
   // ── Real-time refresh when events or registrations change on another page ─
   useEffect(() => {
@@ -473,6 +556,18 @@ export default function EventsPage() {
             <i className="ri-logout-box-r-line" /> Logout
           </button>
 
+          {user && (
+            <button
+              className="nav-icon-btn nav-bookmark-btn"
+              onClick={() => { setNavOpen(false); navigate('/bookmarks'); }}
+              title={`${bookmarkCount} saved event${bookmarkCount !== 1 ? 's' : ''}`}
+              aria-label={`${bookmarkCount} saved event${bookmarkCount !== 1 ? 's' : ''}`}
+            >
+              <i className={bookmarkCount > 0 ? 'ri-bookmark-fill' : 'ri-bookmark-line'} />
+              {bookmarkCount > 0 && <span className="nav-badge">{bookmarkCount}</span>}
+            </button>
+          )}
+
           {/* Theme seg */}
           <div id="themeSeg" className="theme-seg" role="group" aria-label="Theme">
             {[
@@ -621,6 +716,8 @@ export default function EventsPage() {
                 event={ev}
                 index={i}
                 onClick={() => viewEvent(ev)}
+                onBookmark={handleToggleBookmark}
+                isBookmarked={bookmarkedIds.has(ev.id)}
               />
             ))
           )}
@@ -738,6 +835,7 @@ export default function EventsPage() {
               <li><Link to="/login"><i className="ri-arrow-right-s-line" /> Sign In</Link></li>
               <li><Link to="/register"><i className="ri-arrow-right-s-line" /> Create Account</Link></li>
               <li><Link to="/events"><i className="ri-arrow-right-s-line" /> Browse Events</Link></li>
+              <li><Link to="/bookmarks"><i className="ri-bookmark-line" /> Saved Events</Link></li>
             </ul>
           </div>
 

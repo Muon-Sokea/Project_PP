@@ -2,10 +2,14 @@ const express  = require("express");
 const bcrypt   = require("bcryptjs");
 const jwt      = require("jsonwebtoken");
 const { v4: uuidv4 } = require("uuid");
+const { OAuth2Client } = require("google-auth-library");
 const { PrismaClient } = require("@prisma/client");
 const redis    = require("../lib/redis");
 const { sendOtpEmail } = require("../lib/mailer");
 const { requireAuth } = require("../middleware/auth");
+const { verifyTelegramAuth } = require("../lib/telegramAuth");
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -175,6 +179,108 @@ router.post("/reset-password", async (req, res, next) => {
 
     res.json({ message: "Password reset successfully." });
   } catch (err) { next(err); }
+});
+
+// POST /api/auth/google — Sign in / register with Google OAuth
+router.post("/google", async (req, res, next) => {
+  try {
+    const { idToken } = req.body;
+    if (!idToken) return res.status(400).json({ error: "idToken is required." });
+
+    // Verify the Google ID token
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    const { sub: googleId, email, name, picture } = payload;
+
+    if (!email) return res.status(400).json({ error: "Google account has no email." });
+
+    // Check if user exists by googleId or email
+    let user = await prisma.user.findFirst({
+      where: { OR: [{ googleId }, { email: email.toLowerCase() }] },
+    });
+
+    if (user) {
+      // Existing user — link googleId if not already linked
+      if (!user.googleId) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { googleId, avatar: picture || user.avatar },
+        });
+      } else if (picture) {
+        // Update avatar picture on each login
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { avatar: picture },
+        });
+      }
+    } else {
+      // New user — create with Attendee role
+      const nameParts = (name || email.split("@")[0]).split(" ");
+      user = await prisma.user.create({
+        data: {
+          googleId,
+          email: email.toLowerCase(),
+          firstName: nameParts[0] || "User",
+          lastName: nameParts.slice(1).join(" ") || "",
+          avatar: picture || "",
+          password: "",  // No password for OAuth users
+          role: "Attendee",
+        },
+      });
+    }
+
+    if (user.status === "suspended") return res.status(403).json({ error: "Account suspended." });
+
+    const token = signToken(user);
+    res.json({ token, user: safeUser(user) });
+  } catch (err) {
+    console.error("Google auth error:", err.message);
+    res.status(401).json({ error: "Invalid Google token." });
+  }
+});
+
+// POST /api/auth/telegram — Sign in / register with the Telegram Login Widget
+router.post("/telegram", async (req, res, next) => {
+  try {
+    const data = req.body;
+    if (!data || !data.id || !data.hash) return res.status(400).json({ error: "Invalid Telegram payload." });
+    if (!process.env.TELEGRAM_BOT_TOKEN) return res.status(500).json({ error: "Telegram login is not configured." });
+
+    const valid = verifyTelegramAuth(data, process.env.TELEGRAM_BOT_TOKEN);
+    if (!valid) return res.status(401).json({ error: "Invalid or expired Telegram authentication." });
+
+    const telegramId = String(data.id);
+    let user = await prisma.user.findUnique({ where: { telegramId } });
+
+    if (user) {
+      if (data.photo_url && data.photo_url !== user.avatar) {
+        user = await prisma.user.update({ where: { id: user.id }, data: { avatar: data.photo_url } });
+      }
+    } else {
+      user = await prisma.user.create({
+        data: {
+          telegramId,
+          email: `tg_${telegramId}@telegram.local`,
+          firstName: data.first_name || "Telegram",
+          lastName: data.last_name || "User",
+          avatar: data.photo_url || "",
+          password: "",  // No password for OAuth users
+          role: "Attendee",
+        },
+      });
+    }
+
+    if (user.status === "suspended") return res.status(403).json({ error: "Account suspended." });
+
+    const token = signToken(user);
+    res.json({ token, user: safeUser(user) });
+  } catch (err) {
+    console.error("Telegram auth error:", err.message);
+    res.status(401).json({ error: "Invalid Telegram authentication." });
+  }
 });
 
 // POST /api/auth/logout

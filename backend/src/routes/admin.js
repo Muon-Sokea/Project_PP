@@ -28,7 +28,7 @@ router.get("/stats", requireAuth, requireRole("Supervisor", "Admin"), async (req
       select: { price: true, quantity: true, registeredAt: true, status: true },
     });
 
-    const totalRegistrations = confirmedTickets.length;
+    const totalRegistrations = confirmedTickets.reduce((sum, t) => sum + t.quantity, 0);
     const totalRevenue = confirmedTickets.reduce(
       (sum, t) => sum + Number(t.price) * t.quantity,
       0,
