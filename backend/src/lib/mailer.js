@@ -60,7 +60,10 @@ async function verifyEmailService() {
     const res = await fetch("https://api.brevo.com/v3/account", {
       headers: { "api-key": BREVO_API_KEY, "Accept": "application/json" },
     });
-    if (!res.ok) throw new Error(`Brevo API error ${res.status}`);
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`Brevo API error ${res.status}: ${body}`);
+    }
     return;
   }
   await transporter.verify();
