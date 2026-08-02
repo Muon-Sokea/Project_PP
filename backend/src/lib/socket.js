@@ -3,10 +3,15 @@ const jwt = require("jsonwebtoken");
 
 let io = null;
 
-function initSocket(httpServer) {
+function initSocket(httpServer, allowedOrigins = []) {
   io = new Server(httpServer, {
     cors: {
-      origin: (origin, cb) => cb(null, true),
+      origin: (origin, cb) => {
+        if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV === "development") {
+          return cb(null, true);
+        }
+        cb(new Error(`Socket.IO CORS: ${origin} not allowed`));
+      },
       credentials: true,
     },
   });

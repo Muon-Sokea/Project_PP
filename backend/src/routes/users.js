@@ -2,6 +2,7 @@ const express = require("express");
 const bcrypt  = require("bcryptjs");
 const { PrismaClient } = require("@prisma/client");
 const { requireAuth, requireRole } = require("../middleware/auth");
+const { broadcastAdminUpdate } = require("../lib/notify");
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -42,6 +43,7 @@ router.post("/", requireAuth, requireRole("Supervisor", "Admin"), async (req, re
     const user = await prisma.user.create({
       data: { firstName, lastName, email: email.toLowerCase(), password: hash, role },
     });
+    broadcastAdminUpdate(["users"]);
     res.status(201).json(safeUser(user));
   } catch (err) { next(err); }
 });
@@ -64,6 +66,7 @@ router.put("/:id", requireAuth, async (req, res, next) => {
     }
 
     const user = await prisma.user.update({ where: { id: targetId }, data });
+    if (isStaff) broadcastAdminUpdate(["users"]);
     res.json(safeUser(user));
   } catch (err) { next(err); }
 });
@@ -75,6 +78,7 @@ router.delete("/:id", requireAuth, requireRole("Supervisor"), async (req, res, n
     if (req.user.id === targetId) return res.status(400).json({ error: "Cannot delete your own account." });
 
     await prisma.user.delete({ where: { id: targetId } });
+    broadcastAdminUpdate(["users"]);
     res.json({ message: "User deleted." });
   } catch (err) { next(err); }
 });

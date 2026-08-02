@@ -3,7 +3,7 @@ const jwt = require("jsonwebtoken");
 const { PrismaClient } = require("@prisma/client");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const { sendEventApprovalEmail } = require("../lib/mailer");
-const { notifyUser, notifyRoles } = require("../lib/notify");
+const { notifyUser, notifyRoles, broadcastAdminUpdate } = require("../lib/notify");
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -152,6 +152,7 @@ router.post("/", requireAuth, requireRole("Supervisor", "Admin", "Organizer"), a
         link: `/admin`,
       }).catch(err => console.warn("notifyRoles failed:", err.message));
     }
+    broadcastAdminUpdate(["events"]);
 
     res.status(201).json(event);
   } catch (err) { next(err); }
@@ -216,6 +217,7 @@ router.put("/:id", requireAuth, requireRole("Supervisor", "Admin", "Organizer"),
         link: `/admin`,
       }).catch(err => console.warn("notifyRoles failed:", err.message));
     }
+    broadcastAdminUpdate(["events"]);
 
     res.json(updated);
   } catch (err) { next(err); }
@@ -241,6 +243,7 @@ router.delete("/:id", requireAuth, requireRole("Supervisor", "Admin", "Organizer
       // Finally delete the event itself
       await tx.event.delete({ where: { id: eventId } });
     });
+    broadcastAdminUpdate(["events", "tickets"]);
 
     res.json({ message: "Event deleted." });
   } catch (err) { next(err); }
@@ -312,6 +315,7 @@ router.patch("/:id/approve", requireAuth, requireRole("Supervisor", "Admin"), as
       message: `Your event "${event.title}" has been approved and published.`,
       link: `/events/${eventId}`,
     }).catch(err => console.warn("notifyUser failed:", err.message));
+    broadcastAdminUpdate(["events"]);
 
     res.json(updated);
   } catch (err) { next(err); }
@@ -348,6 +352,7 @@ router.patch("/:id/reject", requireAuth, requireRole("Supervisor", "Admin"), asy
       message: `Your event "${event.title}" was rejected by an admin.`,
       link: `/organizer`,
     }).catch(err => console.warn("notifyUser failed:", err.message));
+    broadcastAdminUpdate(["events"]);
 
     res.json(updated);
   } catch (err) { next(err); }
@@ -368,6 +373,7 @@ router.patch("/:id/publish", requireAuth, requireRole("Supervisor", "Admin", "Or
       where: { id: Number(req.params.id) },
       data:  { published: !event.published },
     });
+    broadcastAdminUpdate(["events"]);
     res.json(updated);
   } catch (err) { next(err); }
 });

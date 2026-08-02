@@ -33,6 +33,10 @@ const ALLOWED_ORIGINS = [
   "http://127.0.0.1:5501", "http://localhost:5501",
   "http://127.0.0.1:3000", "http://localhost:3000",
   "https://graceful-strength-production-1c0e.up.railway.app",
+  // Temporary Cloudflare tunnel — used to test Google/Telegram login, which
+  // both require a public HTTPS domain. Ephemeral: replace/remove once a
+  // real production domain is registered with Google Console and BotFather.
+  "https://occupations-requires-expand-genetic.trycloudflare.com",
 ].filter(Boolean);
 
 app.use(cors({
@@ -81,7 +85,7 @@ if (fs.existsSync(frontendDist)) {
 app.use(errorHandler);
 
 const server = http.createServer(app);
-initSocket(server);
+initSocket(server, ALLOWED_ORIGINS);
 
 // start
 server.listen(PORT, "0.0.0.0", () => {

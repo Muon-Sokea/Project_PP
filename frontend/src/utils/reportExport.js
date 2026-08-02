@@ -180,40 +180,70 @@ export async function generatePDFReport(reportData) {
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
   const margin = 15;
   const contentW = pageW - margin * 2;
   let y = margin;
 
+  const NAVY = [40, 52, 71];
+  const BLUE = [74, 144, 217];
+  const LIGHT_BLUE = [235, 242, 250];
+  const BORDER = [222, 228, 236];
+  const TEXT = [45, 52, 62];
+  const MUTED = [120, 128, 140];
+
+  function ensureSpace(needed) {
+    if (y + needed > pageH - margin - 10) {
+      doc.addPage();
+      y = margin;
+    }
+  }
+
+  function sectionTitle(title, subtitle) {
+    ensureSpace(16);
+    doc.setDrawColor(...BLUE);
+    doc.setLineWidth(0.8);
+    doc.line(margin, y, margin, y + 6);
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...NAVY);
+    doc.text(title, margin + 3, y + 4.5);
+    y += 9;
+    if (subtitle) {
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(...MUTED);
+      doc.text(subtitle, margin + 3, y);
+      y += 6;
+    }
+  }
+
   // ── Cover / Header ──────────────────────────────────────────────────────
-  doc.setFillColor(74, 144, 217);
-  doc.rect(0, 0, pageW, 45, 'F');
+  doc.setFillColor(...NAVY);
+  doc.rect(0, 0, pageW, 42, 'F');
+  doc.setFillColor(...BLUE);
+  doc.rect(0, 42, pageW, 1.5, 'F');
 
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
-  doc.text('ERMS System Report', margin, 20);
+  doc.text('ERMS System Report', margin, 19);
 
-  doc.setFontSize(11);
+  doc.setFontSize(10.5);
   doc.setFont('helvetica', 'normal');
-  doc.text('Event Registration & Management System', margin, 28);
+  doc.setTextColor(210, 220, 235);
+  doc.text('Event Registration & Management System', margin, 27);
 
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   const dateRangeLabel = dateRange?.isFiltered
     ? `Date Range: ${dateRange.startDate ? formatDate(dateRange.startDate) : 'Start'} — ${dateRange.endDate ? formatDate(dateRange.endDate) : 'Now'}`
     : 'Date Range: All Time';
-  doc.text(`Generated: ${formatDateTime(generatedAt)}  |  ${dateRangeLabel}`, margin, 36);
+  doc.text(`Generated ${formatDateTime(generatedAt)}   •   ${dateRangeLabel}`, margin, 35);
 
-  y = 55;
+  y = 54;
 
-  // ── Executive Summary ───────────────────────────────────────────────────
-  doc.setTextColor(40, 40, 40);
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Executive Summary', margin, y);
-  y += 8;
-
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
+  // ── Executive Summary (KPI cards) ───────────────────────────────────────
+  sectionTitle('Executive Summary');
 
   const summaryItems = [
     ['Total Users', summary.totalUsers],
@@ -226,210 +256,205 @@ export async function generatePDFReport(reportData) {
     ['Approved Refunds', summary.approvedRefunds],
   ];
 
-  // Draw summary table
-  doc.setFillColor(240, 245, 250);
-  const rowH = 7;
+  const cardCols = 4;
+  const cardGap = 4;
+  const cardW = (contentW - cardGap * (cardCols - 1)) / cardCols;
+  const cardH = 20;
+  ensureSpace(cardH * 2 + cardGap);
   summaryItems.forEach(([label, value], i) => {
-    if (i % 2 === 0) {
-      doc.setFillColor(240, 245, 250);
-      doc.rect(margin, y - 4, contentW, rowH, 'F');
-    }
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(80, 80, 80);
-    doc.text(label, margin + 2, y);
+    const col = i % cardCols;
+    const row = Math.floor(i / cardCols);
+    const cx = margin + col * (cardW + cardGap);
+    const cy = y + row * (cardH + cardGap);
+
+    doc.setFillColor(...LIGHT_BLUE);
+    doc.setDrawColor(...BORDER);
+    doc.setLineWidth(0.2);
+    doc.roundedRect(cx, cy, cardW, cardH, 1.5, 1.5, 'FD');
+
+    doc.setFontSize(12.5);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(40, 40, 40);
-    doc.text(String(value), margin + contentW / 2, y);
-    y += rowH;
+    doc.setTextColor(...NAVY);
+    doc.text(String(value), cx + 4, cy + 9);
+
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...MUTED);
+    doc.text(label, cx + 4, cy + 15.5);
   });
+  y += Math.ceil(summaryItems.length / cardCols) * (cardH + cardGap) + 6;
 
-  y += 8;
+  // ── Charts (2 per row, in bordered cards) ───────────────────────────────
+  doc.addPage();
+  y = margin;
+  sectionTitle('Analytics');
 
-  // ── Charts (2 per row) ──────────────────────────────────────────────────
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(40, 40, 40);
-  doc.text('Analytics', margin, y);
-  y += 6;
+  const chartGap = 4;
+  const chartW = (contentW - chartGap) / 2;
+  const chartH = 62;
+  const chartPad = 3;
 
-  const chartW = contentW / 2 - 2;
-  const chartH = 65;
-
-  // Check if charts fit on current page
-  if (y + chartH * 2 + 10 > doc.internal.pageSize.getHeight()) {
-    doc.addPage();
-    y = margin;
+  function chartCard(img, cx, cy) {
+    doc.setDrawColor(...BORDER);
+    doc.setFillColor(255, 255, 255);
+    doc.setLineWidth(0.2);
+    doc.roundedRect(cx, cy, chartW, chartH, 1.5, 1.5, 'FD');
+    doc.addImage(img, 'PNG', cx + chartPad, cy + chartPad, chartW - chartPad * 2, chartH - chartPad * 2);
   }
 
-  doc.addImage(revenueImg, 'PNG', margin, y, chartW, chartH);
-  doc.addImage(categoryImg, 'PNG', margin + chartW + 4, y, chartW, chartH);
-  y += chartH + 4;
-  doc.addImage(roleImg, 'PNG', margin, y, chartW, chartH);
-  doc.addImage(regImg, 'PNG', margin + chartW + 4, y, chartW, chartH);
+  ensureSpace(chartH * 2 + chartGap);
+  chartCard(revenueImg, margin, y);
+  chartCard(categoryImg, margin + chartW + chartGap, y);
+  y += chartH + chartGap;
+  chartCard(roleImg, margin, y);
+  chartCard(regImg, margin + chartW + chartGap, y);
   y += chartH + 10;
 
-  // ── Helper: draw a table ────────────────────────────────────────────────
-  function drawTable(headers, rows, startY) {
-    let localY = startY;
-    const colW = contentW / headers.length;
+  // ── Helper: draw a table with weighted columns, wrapping & borders ─────
+  function drawTable(headers, rows, colWeights, note) {
+    const totalWeight = colWeights.reduce((a, b) => a + b, 0);
+    const colWidths = colWeights.map(w => (w / totalWeight) * contentW);
+    const colX = [];
+    let acc = margin;
+    colWidths.forEach(w => { colX.push(acc); acc += w; });
 
-    // Check page break
-    const neededH = 10 + rows.length * 6;
-    if (localY + neededH > doc.internal.pageSize.getHeight() - margin) {
-      doc.addPage();
-      localY = margin;
+    const cellPad = 1.8;
+    const lineH = 3.6;
+    const headerH = 7;
+
+    function drawHeader(localY) {
+      doc.setFillColor(...NAVY);
+      doc.rect(margin, localY, contentW, headerH, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(7.8);
+      doc.setFont('helvetica', 'bold');
+      headers.forEach((h, i) => {
+        doc.text(h, colX[i] + cellPad, localY + headerH / 2 + 1.3);
+      });
+      return localY + headerH;
     }
 
-    // Header row
-    doc.setFillColor(74, 144, 217);
-    doc.rect(margin, localY - 4, contentW, 8, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
-    headers.forEach((h, i) => {
-      doc.text(h, margin + i * colW + 2, localY + 1);
-    });
-    localY += 6;
+    if (note) {
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(...MUTED);
+      doc.text(note, margin, y);
+      y += 5;
+    }
 
-    // Data rows
+    ensureSpace(headerH + lineH * 2);
+    y = drawHeader(y);
+
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
+    doc.setFontSize(7.3);
+
     rows.forEach((row, ri) => {
-      if (localY + 6 > doc.internal.pageSize.getHeight() - margin) {
+      const wrapped = row.map((cell, ci) =>
+        doc.splitTextToSize(String(cell ?? '—'), colWidths[ci] - cellPad * 2));
+      const rowLines = Math.max(...wrapped.map(w => w.length), 1);
+      const rowH = rowLines * lineH + 2;
+
+      if (y + rowH > pageH - margin - 10) {
         doc.addPage();
-        localY = margin;
-        // Re-draw header
-        doc.setFillColor(74, 144, 217);
-        doc.rect(margin, localY - 4, contentW, 8, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8);
-        headers.forEach((h, i) => {
-          doc.text(h, margin + i * colW + 2, localY + 1);
-        });
-        localY += 6;
+        y = margin;
+        y = drawHeader(y);
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7.5);
+        doc.setFontSize(7.3);
       }
 
       if (ri % 2 === 0) {
-        doc.setFillColor(245, 248, 252);
-        doc.rect(margin, localY - 4, contentW, 5.5, 'F');
+        doc.setFillColor(...LIGHT_BLUE);
+        doc.rect(margin, y, contentW, rowH, 'F');
       }
-      doc.setTextColor(60, 60, 60);
-      row.forEach((cell, ci) => {
-        const txt = String(cell ?? '—').substring(0, 40);
-        doc.text(txt, margin + ci * colW + 2, localY);
+      doc.setDrawColor(...BORDER);
+      doc.setLineWidth(0.15);
+      doc.rect(margin, y, contentW, rowH);
+      colX.slice(1).forEach(x => doc.line(x, y, x, y + rowH));
+
+      doc.setTextColor(...TEXT);
+      wrapped.forEach((lines, ci) => {
+        lines.forEach((line, li) => {
+          doc.text(line, colX[ci] + cellPad, y + lineH * (li + 1) - 0.5);
+        });
       });
-      localY += 5.5;
+      y += rowH;
     });
 
-    return localY + 6;
+    y += 8;
   }
 
-  // ── Users Table ─────────────────────────────────────────────────────────
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(40, 40, 40);
-  doc.text(`Users (${users.length})`, margin, y);
-  y += 6;
-
-  y = drawTable(
+  // ── Users ────────────────────────────────────────────────────────────────
+  const USER_CAP = 25;
+  const usersShown = [...users]
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, USER_CAP);
+  sectionTitle(`Users (${users.length})`);
+  drawTable(
     ['Name', 'Email', 'Role', 'Status', 'Joined'],
-    users.map(u => [
-      `${u.firstName} ${u.lastName}`,
-      u.email,
-      u.role,
-      u.status,
-      formatDate(u.createdAt),
-    ]),
-    y,
+    usersShown.map(u => [`${u.firstName} ${u.lastName}`, u.email, u.role, u.status, formatDate(u.createdAt)]),
+    [2, 3, 1.4, 1.2, 1.4],
+    users.length > USER_CAP
+      ? `Showing ${USER_CAP} most recently joined of ${users.length} total — full list available in the CSV export.`
+      : null,
   );
 
-  // ── Events Table ────────────────────────────────────────────────────────
-  y += 4;
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(40, 40, 40);
-  doc.text(`Events (${events.length})`, margin, y);
-  y += 6;
-
-  y = drawTable(
+  // ── Events ───────────────────────────────────────────────────────────────
+  const EVENT_CAP = 25;
+  const eventsShown = [...events].sort((a, b) => b.revenue - a.revenue).slice(0, EVENT_CAP);
+  sectionTitle(`Events (${events.length})`);
+  drawTable(
     ['Title', 'Organizer', 'Category', 'Date', 'Tickets', 'Revenue'],
-    events.map(e => [
-      e.title.substring(0, 30),
-      e.organizer,
-      e.category,
-      formatDate(e.date),
-      e.ticketsSold,
-      `$${e.revenue.toLocaleString()}`,
-    ]),
-    y,
+    eventsShown.map(e => [e.title, e.organizer, e.category, formatDate(e.date), e.ticketsSold, `$${e.revenue.toLocaleString()}`]),
+    [2.4, 1.6, 1.2, 1.2, 0.9, 1.1],
+    events.length > EVENT_CAP
+      ? `Showing top ${EVENT_CAP} events by revenue of ${events.length} total — full list available in the CSV export.`
+      : null,
   );
 
-  // ── Tickets Table ───────────────────────────────────────────────────────
-  y += 4;
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(40, 40, 40);
-  doc.text(`Tickets (${tickets.length})`, margin, y);
-  y += 6;
-
-  y = drawTable(
+  // ── Tickets ──────────────────────────────────────────────────────────────
+  const TICKET_CAP = 30;
+  const ticketsShown = [...tickets]
+    .sort((a, b) => new Date(b.registeredAt) - new Date(a.registeredAt))
+    .slice(0, TICKET_CAP);
+  sectionTitle(`Tickets (${tickets.length})`);
+  drawTable(
     ['Code', 'Buyer', 'Event', 'Qty', 'Price', 'Total', 'Status'],
-    tickets.map(t => [
-      t.ticketCode.substring(0, 8),
-      t.buyer.substring(0, 20),
-      t.eventTitle.substring(0, 20),
-      t.quantity,
-      `$${t.price}`,
-      `$${t.totalAmount}`,
-      t.status,
-    ]),
-    y,
+    ticketsShown.map(t => [t.ticketCode.substring(0, 8), t.buyer, t.eventTitle, t.quantity, `$${t.price}`, `$${t.totalAmount}`, t.status]),
+    [1.1, 1.6, 1.8, 0.6, 0.8, 0.9, 1],
+    tickets.length > TICKET_CAP
+      ? `Showing ${TICKET_CAP} most recent tickets of ${tickets.length} total — full list available in the CSV export.`
+      : null,
   );
 
-  // ── Refunds Table ───────────────────────────────────────────────────────
+  // ── Refunds ──────────────────────────────────────────────────────────────
   if (refunds.length > 0) {
-    y += 4;
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(40, 40, 40);
-    doc.text(`Refunds (${refunds.length})`, margin, y);
-    y += 6;
-
-    y = drawTable(
+    const REFUND_CAP = 25;
+    const refundsShown = [...refunds]
+      .sort((a, b) => (a.status === 'pending' ? -1 : 1) - (b.status === 'pending' ? -1 : 1))
+      .slice(0, REFUND_CAP);
+    sectionTitle(`Refunds (${refunds.length})`);
+    drawTable(
       ['User', 'Event', 'Reason', 'Status', 'Requested'],
-      refunds.map(r => [
-        r.user.substring(0, 20),
-        r.eventName.substring(0, 20),
-        r.reason.substring(0, 25),
-        r.status,
-        formatDate(r.requestedAt),
-      ]),
-      y,
+      refundsShown.map(r => [r.user, r.eventName, r.reason, r.status, formatDate(r.requestedAt)]),
+      [1.6, 1.8, 2, 1, 1.2],
+      refunds.length > REFUND_CAP
+        ? `Showing ${REFUND_CAP} of ${refunds.length} total (pending first) — full list available in the CSV export.`
+        : null,
     );
   }
 
-  // ── Testimonials Table ──────────────────────────────────────────────────
+  // ── Testimonials ─────────────────────────────────────────────────────────
   if (testimonials.length > 0) {
-    y += 4;
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(40, 40, 40);
-    doc.text(`Testimonials (${testimonials.length})`, margin, y);
-    y += 6;
-
-    y = drawTable(
+    const TESTIMONIAL_CAP = 20;
+    const testimonialsShown = [...testimonials].sort((a, b) => b.rating - a.rating).slice(0, TESTIMONIAL_CAP);
+    sectionTitle(`Testimonials (${testimonials.length})`);
+    drawTable(
       ['User', 'Event', 'Rating', 'Content', 'Date'],
-      testimonials.map(t => [
-        t.user.substring(0, 20),
-        (t.eventTitle || '—').substring(0, 20),
-        `${t.rating}/5`,
-        t.content.substring(0, 30),
-        formatDate(t.createdAt),
-      ]),
-      y,
+      testimonialsShown.map(t => [t.user, t.eventTitle || '—', `${t.rating}/5`, t.content, formatDate(t.createdAt)]),
+      [1.4, 1.6, 0.8, 3, 1.2],
+      testimonials.length > TESTIMONIAL_CAP
+        ? `Showing top ${TESTIMONIAL_CAP} rated of ${testimonials.length} total — full list available in the CSV export.`
+        : null,
     );
   }
 

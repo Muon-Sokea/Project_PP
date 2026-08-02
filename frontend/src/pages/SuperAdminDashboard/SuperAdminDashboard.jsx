@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { loadLS, saveLS } from '../../utils/storage.js';
+import { useNotifications } from '../../context/NotificationContext.jsx';
 import { fmtDate, fmtTime } from '../../utils/formatDate.js';
 import { apiGetAdminStats, apiGetAuditLogs, apiGetSystemHealth, apiGetHealthHistory, apiGetReportData, apiEmailReport } from '../../services/admin.service.js';
 import { apiGetAllUsers } from '../../services/user.service.js';
@@ -139,35 +140,46 @@ export default function SuperAdminDashboard() {
   const [loadingHealth, setLoadingHealth] = useState(true);
   const [lastHealthCheck, setLastHealthCheck] = useState(null);
 
-  useEffect(() => {
-    async function loadStats() {
-      try {
-        const data = await apiGetAdminStats();
-        setAdminStats(data);
-      } catch (err) {
-        console.error('Failed to load admin stats:', err);
-      } finally {
-        setLoadingStats(false);
-      }
+  const loadStats = useCallback(async () => {
+    try {
+      const data = await apiGetAdminStats();
+      setAdminStats(data);
+    } catch (err) {
+      console.error('Failed to load admin stats:', err);
+    } finally {
+      setLoadingStats(false);
     }
-    loadStats();
   }, []);
+
+  const loadUsers = useCallback(async () => {
+    const users = await apiGetAllUsers().catch(() => []);
+    setApiUsers(Array.isArray(users) ? users : []);
+  }, []);
+
+  const loadEvents = useCallback(async () => {
+    const events = await apiGetAllEvents().catch(() => []);
+    setApiAllEvents(Array.isArray(events) ? events : []);
+  }, []);
+
+  const loadRefunds = useCallback(async () => {
+    const refunds = await apiGetRefunds().catch(() => []);
+    setApiRefunds(Array.isArray(refunds) ? refunds : []);
+  }, []);
+
+  useEffect(() => { loadStats(); }, [loadStats]);
 
   // Load real users, events, refunds for other tabs
   useEffect(() => {
-    async function loadData() {
+    (async () => {
       try {
-        const [users, events, refunds, audit, health, history] = await Promise.all([
-          apiGetAllUsers().catch(() => []),
-          apiGetAllEvents().catch(() => []),
-          apiGetRefunds().catch(() => []),
+        const [, , , audit, health, history] = await Promise.all([
+          loadUsers(),
+          loadEvents(),
+          loadRefunds(),
           apiGetAuditLogs().catch(() => []),
           apiGetSystemHealth().catch(() => null),
           apiGetHealthHistory(50).catch(() => []),
         ]);
-        setApiUsers(Array.isArray(users) ? users : []);
-        setApiAllEvents(Array.isArray(events) ? events : []);
-        setApiRefunds(Array.isArray(refunds) ? refunds : []);
         setAuditLogs(Array.isArray(audit) ? audit : []);
         setSystemHealth(health);
         setHealthHistory(Array.isArray(history) ? history : []);
@@ -177,10 +189,10 @@ export default function SuperAdminDashboard() {
         setLoadingAudit(false);
         setLoadingHealth(false);
       }
-    }
-    loadData();
+    })();
 
-    // Auto-refresh health every 60 seconds
+    // Auto-refresh health every 60 seconds (fallback poll — the socket
+    // listener below handles tickets/events/users/refunds in real time)
     const interval = setInterval(async () => {
       try {
         const [health, history] = await Promise.all([
@@ -194,7 +206,31 @@ export default function SuperAdminDashboard() {
     }, 60000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [loadUsers, loadEvents, loadRefunds]);
+
+  // ── Real-time updates ───────────────────────────────────────────────────
+  // The backend emits "admin:update" (to the Supervisor/Admin socket rooms)
+  // whenever a write changes data this dashboard shows — ticket registrations,
+  // refunds, event approvals, user changes, etc. Refetch only the affected
+  // slice instead of polling, so the Overview/Users/Events/Refunds tabs stay
+  // live without a manual page reload. Add new resource names here (and on
+  // the backend's broadcastAdminUpdate calls) as more views need this.
+  const { socket } = useNotifications();
+  useEffect(() => {
+    if (!socket) return;
+    const RESOURCE_LOADERS = {
+      tickets: loadStats,
+      events: loadEvents,
+      users: loadUsers,
+      refunds: loadRefunds,
+    };
+    function handleAdminUpdate({ resources = [] } = {}) {
+      const loaders = new Set(resources.map(r => RESOURCE_LOADERS[r]).filter(Boolean));
+      loaders.forEach(loader => loader());
+    }
+    socket.on('admin:update', handleAdminUpdate);
+    return () => socket.off('admin:update', handleAdminUpdate);
+  }, [socket, loadStats, loadEvents, loadUsers, loadRefunds]);
 
   const [roleFilter,   setRoleFilter]   = useState('all');
   const [userSearch,   setUserSearch]   = useState('');

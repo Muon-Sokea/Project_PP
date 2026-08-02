@@ -1,13 +1,13 @@
 const express  = require("express");
 const bcrypt   = require("bcryptjs");
 const jwt      = require("jsonwebtoken");
-const { v4: uuidv4 } = require("uuid");
 const { OAuth2Client } = require("google-auth-library");
 const { PrismaClient } = require("@prisma/client");
 const redis    = require("../lib/redis");
 const { sendOtpEmail } = require("../lib/mailer");
 const { requireAuth } = require("../middleware/auth");
 const { verifyTelegramAuth } = require("../lib/telegramAuth");
+const { loginLimiter, authActionLimiter } = require("../middleware/rateLimit");
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -28,7 +28,7 @@ function safeUser(user) {
 }
 
 // POST /api/auth/login
-router.post("/login", async (req, res, next) => {
+router.post("/login", loginLimiter, async (req, res, next) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: "Email and password are required." });
@@ -47,7 +47,7 @@ router.post("/login", async (req, res, next) => {
 });
 
 // POST /api/auth/register
-router.post("/register", async (req, res, next) => {
+router.post("/register", authActionLimiter, async (req, res, next) => {
   try {
     const { firstName, lastName, email, password, phone = "" } = req.body;
     if (!firstName || !lastName || !email || !password)
@@ -79,7 +79,7 @@ router.post("/register", async (req, res, next) => {
 });
 
 // POST /api/auth/verify-email
-router.post("/verify-email", async (req, res, next) => {
+router.post("/verify-email", authActionLimiter, async (req, res, next) => {
   try {
     const { userId, code } = req.body;
     const user = await prisma.user.findUnique({ where: { id: Number(userId) } });
@@ -102,7 +102,7 @@ router.post("/verify-email", async (req, res, next) => {
 });
 
 // POST /api/auth/resend-otp
-router.post("/resend-otp", async (req, res, next) => {
+router.post("/resend-otp", authActionLimiter, async (req, res, next) => {
   try {
     const { userId } = req.body;
     const user = await prisma.user.findUnique({ where: { id: Number(userId) } });
@@ -127,7 +127,7 @@ router.post("/resend-otp", async (req, res, next) => {
 });
 
 // POST /api/auth/forgot-password
-router.post("/forgot-password", async (req, res, next) => {
+router.post("/forgot-password", authActionLimiter, async (req, res, next) => {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: "Email is required." });
@@ -155,7 +155,7 @@ router.post("/forgot-password", async (req, res, next) => {
 });
 
 // POST /api/auth/reset-password
-router.post("/reset-password", async (req, res, next) => {
+router.post("/reset-password", authActionLimiter, async (req, res, next) => {
   try {
     const { userId, code, newPassword } = req.body;
     if (!userId || !code || !newPassword)

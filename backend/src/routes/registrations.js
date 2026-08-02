@@ -1,8 +1,8 @@
+const crypto = require("crypto");
 const express = require("express");
-const { v4: uuidv4 } = require("uuid");
 const { PrismaClient } = require("@prisma/client");
 const { requireAuth } = require("../middleware/auth");
-const { notifyUser, broadcastCapacity } = require("../lib/notify");
+const { notifyUser, broadcastCapacity, broadcastAdminUpdate } = require("../lib/notify");
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -92,7 +92,7 @@ router.post("/", requireAuth, async (req, res, next) => {
 
     const ticket = await prisma.ticket.create({
       data: {
-        ticketCode: uuidv4(),
+        ticketCode: crypto.randomUUID(),
         ticketType,
         quantity: qty,
         price: unitPrice,
@@ -111,6 +111,7 @@ router.post("/", requireAuth, async (req, res, next) => {
       }).catch(err => console.warn("notifyUser failed:", err.message));
     }
     broadcastCapacity(event.id);
+    broadcastAdminUpdate(["tickets", "events"]);
 
     res.status(201).json({
       id:          ticket.id,
