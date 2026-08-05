@@ -271,6 +271,24 @@ function drawSectionTitle(doc, text, y) {
   return y + 10;
 }
 
+// Caps a large dataset for the PDF (which renders every row as real vector
+// text — hundreds of rows makes for a genuinely enormous file) while keeping
+// the full data in the Excel export. Returns the row slice to render plus an
+// italic note drawn above the table when rows were cut, telling the reader
+// where to find the rest.
+function capRows(list, cap) {
+  return list.length > cap ? list.slice(0, cap) : list;
+}
+
+function drawCapNote(doc, y, total, cap, label) {
+  if (total <= cap) return y;
+  doc.setFontSize(8);
+  doc.setFont('KhmerOS', 'normal');
+  doc.setTextColor(...PDF.MUTED);
+  doc.text(`Showing ${cap} of ${total} ${label} — full list available in the Excel export.`, PDF.MARGIN, y);
+  return y + 5;
+}
+
 // ── PDF: Draw a properly structured table ────────────────────────────────────
 
 function drawDataTable(doc, headers, rows, startY, options = {}) {
@@ -749,11 +767,14 @@ export async function generatePDFReport(reportData) {
   // ══════════════════════════════════════════════════════════════════════
   // USERS TABLE
   // ══════════════════════════════════════════════════════════════════════
+  const USER_CAP = 25;
+  const usersShown = capRows([...users].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)), USER_CAP);
   y = drawSectionTitle(doc, `Users  (${users.length})`, y);
+  y = drawCapNote(doc, y, users.length, USER_CAP, 'most recently joined users');
 
   y = drawDataTable(doc,
     ['Name', 'Email', 'Role', 'Status', 'Joined'],
-    users.map(u => [
+    usersShown.map(u => [
       `${u.firstName} ${u.lastName}`.substring(0, 22),
       u.email.substring(0, 26),
       u.role,
@@ -770,11 +791,14 @@ export async function generatePDFReport(reportData) {
   // ══════════════════════════════════════════════════════════════════════
   // EVENTS TABLE
   // ══════════════════════════════════════════════════════════════════════
+  const EVENT_CAP = 25;
+  const eventsShown = capRows([...events].sort((a, b) => b.revenue - a.revenue), EVENT_CAP);
   y = drawSectionTitle(doc, `Events  (${events.length})`, y);
+  y = drawCapNote(doc, y, events.length, EVENT_CAP, 'events by revenue');
 
   y = drawDataTable(doc,
     ['Title', 'Organizer', 'Category', 'Date', 'Tickets', 'Revenue'],
-    events.map(e => [
+    eventsShown.map(e => [
       e.title.substring(0, 28),
       e.organizer.substring(0, 18),
       e.category.substring(0, 14),
@@ -792,11 +816,14 @@ export async function generatePDFReport(reportData) {
   // ══════════════════════════════════════════════════════════════════════
   // TICKETS TABLE
   // ══════════════════════════════════════════════════════════════════════
+  const TICKET_CAP = 30;
+  const ticketsShown = capRows([...tickets].sort((a, b) => new Date(b.registeredAt) - new Date(a.registeredAt)), TICKET_CAP);
   y = drawSectionTitle(doc, `Tickets  (${tickets.length})`, y);
+  y = drawCapNote(doc, y, tickets.length, TICKET_CAP, 'most recent tickets');
 
   y = drawDataTable(doc,
     ['Code', 'Buyer', 'Event', 'Qty', 'Price', 'Total', 'Status'],
-    tickets.map(t => [
+    ticketsShown.map(t => [
       t.ticketCode.substring(0, 8),
       t.buyer.substring(0, 18),
       t.eventTitle.substring(0, 18),
@@ -816,11 +843,17 @@ export async function generatePDFReport(reportData) {
   // REFUNDS TABLE
   // ══════════════════════════════════════════════════════════════════════
   if (refunds.length > 0) {
+    const REFUND_CAP = 25;
+    const refundsShown = capRows(
+      [...refunds].sort((a, b) => (a.status === 'pending' ? -1 : 1) - (b.status === 'pending' ? -1 : 1)),
+      REFUND_CAP,
+    );
     y = drawSectionTitle(doc, `Refunds  (${refunds.length})`, y);
+    y = drawCapNote(doc, y, refunds.length, REFUND_CAP, 'refunds, pending first');
 
     y = drawDataTable(doc,
       ['User', 'Event', 'Reason', 'Status', 'Requested'],
-      refunds.map(r => [
+      refundsShown.map(r => [
         r.user.substring(0, 20),
         r.eventName.substring(0, 22),
         r.reason.substring(0, 24),
@@ -839,11 +872,14 @@ export async function generatePDFReport(reportData) {
   // TESTIMONIALS TABLE
   // ══════════════════════════════════════════════════════════════════════
   if (testimonials.length > 0) {
+    const TESTIMONIAL_CAP = 20;
+    const testimonialsShown = capRows([...testimonials].sort((a, b) => b.rating - a.rating), TESTIMONIAL_CAP);
     y = drawSectionTitle(doc, `Testimonials  (${testimonials.length})`, y);
+    y = drawCapNote(doc, y, testimonials.length, TESTIMONIAL_CAP, 'testimonials by rating');
 
     y = drawDataTable(doc,
       ['User', 'Event', 'Rating', 'Review', 'Date'],
-      testimonials.map(t => [
+      testimonialsShown.map(t => [
         t.user.substring(0, 18),
         (t.eventTitle || '—').substring(0, 22),
         `${t.rating} / 5`,

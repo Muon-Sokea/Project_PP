@@ -1,5 +1,8 @@
 const nodemailer = require("nodemailer");
 
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
+
 const transporter = nodemailer.createTransport({
   host:   process.env.SMTP_HOST,
   port:   Number(process.env.SMTP_PORT) || 587,
@@ -9,6 +12,62 @@ const transporter = nodemailer.createTransport({
     pass: process.env.SMTP_PASS,
   },
 });
+
+// Parses `"Name" <email@x.com>` (or a bare email) into Brevo's {name, email} shape.
+function parseFrom(fromStr) {
+  const match = String(fromStr || "").match(/^"?([^"<]*)"?\s*<(.+)>$/);
+  if (match) return { name: match[1].trim() || undefined, email: match[2].trim() };
+  return { email: String(fromStr || "").trim() };
+}
+
+// Sends via Brevo's HTTP API (port 443) whenever BREVO_API_KEY is set. Many
+// cloud hosts (Railway included) silently block outbound SMTP (port 587) to
+// prevent spam-relay abuse, which makes the transporter below hang until
+// timeout in production — the HTTP API sidesteps that entirely. Falls back
+// to plain SMTP for local dev, where the API key usually isn't configured.
+async function sendMail({ from, to, subject, html }) {
+  if (BREVO_API_KEY) {
+    const res = await fetch(BREVO_API_URL, {
+      method: "POST",
+      headers: {
+        "api-key": BREVO_API_KEY,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+      body: JSON.stringify({
+        sender: parseFrom(from),
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`Brevo API error ${res.status}: ${body}`);
+    }
+    return;
+  }
+  await transporter.sendMail({ from, to, subject, html });
+}
+
+function isEmailConfigured() {
+  return !!(BREVO_API_KEY || process.env.SMTP_USER);
+}
+
+// Lightweight connectivity check for the system-health endpoint.
+async function verifyEmailService() {
+  if (BREVO_API_KEY) {
+    const res = await fetch("https://api.brevo.com/v3/account", {
+      headers: { "api-key": BREVO_API_KEY, "Accept": "application/json" },
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`Brevo API error ${res.status}: ${body}`);
+    }
+    return;
+  }
+  await transporter.verify();
+}
 
 /**
  * Send a 6-digit OTP email.
@@ -41,7 +100,7 @@ async function sendOtpEmail(to, otp, purpose = "verification") {
     </p>
   </div>`;
 
-  await transporter.sendMail({
+  await sendMail({
     from:    process.env.SMTP_FROM || `"Planning Center" <${process.env.SMTP_USER}>`,
     to,
     subject: `${otp} is your Planning Center code`,
@@ -94,7 +153,7 @@ async function sendEventReminderEmail(to, { eventTitle, eventDate, eventTime, ev
     </div>
     <p style="font-size:14px;color:#555;margin:0 0 8px">Don't forget to bring your QR ticket for check-in. You can view it in your dashboard.</p>
   `;
-  await transporter.sendMail({
+  await sendMail({
     from: process.env.SMTP_FROM || `"Planning Center" <${process.env.SMTP_USER}>`,
     to,
     subject: `📅 Reminder: ${eventTitle} is coming up!`,
@@ -120,7 +179,7 @@ async function sendNewEventEmail(to, { eventTitle, eventDate, eventLocation, eve
     <a href="${link}" style="display:inline-block;background:#F5A623;color:#fff;text-decoration:none;
               padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600">View event &amp; register</a>
   `;
-  await transporter.sendMail({
+  await sendMail({
     from: process.env.SMTP_FROM || `"Planning Center" <${process.env.SMTP_USER}>`,
     to,
     subject: `🎉 New event: ${eventTitle}`,
@@ -145,7 +204,7 @@ async function sendRefundUpdateEmail(to, { eventName, ticketCode, status, reason
       ${ticketCode ? `<p style="margin:4px 0 0;font-size:12px;color:#8888a0">Ticket: ${ticketCode}</p>` : ''}
     </div>
   `;
-  await transporter.sendMail({
+  await sendMail({
     from: process.env.SMTP_FROM || `"Planning Center" <${process.env.SMTP_USER}>`,
     to,
     subject: `Refund ${status}: ${eventName}`,
@@ -165,7 +224,7 @@ async function sendPromotionalEmail(to, { title, message, ctaText, ctaLink }) {
          font-size:14px;font-weight:600;margin:0 0 16px">${ctaText}</a>
     ` : ''}
   `;
-  await transporter.sendMail({
+  await sendMail({
     from: process.env.SMTP_FROM || `"Planning Center" <${process.env.SMTP_USER}>`,
     to,
     subject: title,
@@ -183,7 +242,7 @@ async function sendTestEmail(to) {
       your notification settings are working correctly!
     </p>
   `;
-  await transporter.sendMail({
+  await sendMail({
     from: process.env.SMTP_FROM || `"Planning Center" <${process.env.SMTP_USER}>`,
     to,
     subject: '✅ Test notification from Planning Center',
@@ -217,7 +276,7 @@ async function sendEventApprovalEmail(to, { eventTitle, status }) {
       `}
     </div>
   `;
-  await transporter.sendMail({
+  await sendMail({
     from: process.env.SMTP_FROM || `"Planning Center" <${process.env.SMTP_USER}>`,
     to,
     subject: `${icon} Event ${statusLabel}: ${eventTitle}`,
@@ -225,4 +284,8 @@ async function sendEventApprovalEmail(to, { eventTitle, status }) {
   });
 }
 
-module.exports = { sendOtpEmail, sendEventReminderEmail, sendNewEventEmail, sendRefundUpdateEmail, sendPromotionalEmail, sendTestEmail, sendEventApprovalEmail, transporter };
+module.exports = {
+  sendOtpEmail, sendEventReminderEmail, sendNewEventEmail, sendRefundUpdateEmail,
+  sendPromotionalEmail, sendTestEmail, sendEventApprovalEmail,
+  isEmailConfigured, verifyEmailService, sendMail, transporter,
+};

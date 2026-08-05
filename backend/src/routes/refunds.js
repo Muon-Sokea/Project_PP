@@ -1,7 +1,7 @@
 const express = require("express");
 const { PrismaClient } = require("@prisma/client");
 const { requireAuth, requireRole } = require("../middleware/auth");
-const { notifyUser, notifyRoles, broadcastCapacity, broadcastEventUpdate } = require("../lib/notify");
+const { notifyUser, notifyRoles, broadcastCapacity, broadcastEventUpdate, broadcastAdminUpdate } = require("../lib/notify");
 const { sendRefundUpdateEmail } = require("../lib/mailer");
 
 const router = express.Router();
@@ -30,6 +30,7 @@ router.post("/", requireAuth, async (req, res, next) => {
     broadcastCapacity(ticket.eventId);
     broadcastEventUpdate("capacity-changed", { id: ticket.eventId })
       .catch(err => console.warn("broadcastEventUpdate failed:", err.message));
+    broadcastAdminUpdate(["tickets", "events", "refunds"]);
 
     notifyRoles(["Admin", "Supervisor"], {
       type: "refund_requested",
@@ -72,6 +73,7 @@ router.patch("/:ticketCode", requireAuth, requireRole("Supervisor", "Admin"), as
       where: { ticketCode: req.params.ticketCode },
       data:  { status, resolvedAt: new Date() },
     });
+    broadcastAdminUpdate(["refunds"]);
 
     notifyUser(refund.userId, {
       type: "refund_resolved",

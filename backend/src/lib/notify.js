@@ -51,4 +51,17 @@ async function broadcastEventUpdate(action, eventData) {
   } catch { /* socket.io not initialized (e.g. in tests) */ }
 }
 
-module.exports = { notifyUser, notifyRoles, broadcastCapacity, broadcastEventUpdate };
+// Tells Admin/Supervisor dashboards which data just changed, so they can
+// refetch instead of showing a stale snapshot until the page is reloaded.
+// `resources` is a list of the dashboard's data slices affected by the write
+// that just happened, e.g. ["tickets", "events"] after a registration —
+// add new resource names here as more admin views need live updates.
+function broadcastAdminUpdate(resources) {
+  try {
+    const io = getIO();
+    const payload = { resources: Array.isArray(resources) ? resources : [resources], at: new Date().toISOString() };
+    io.to("role:Supervisor").to("role:Admin").emit("admin:update", payload);
+  } catch { /* socket.io not initialized (e.g. in tests) */ }
+}
+
+module.exports = { notifyUser, notifyRoles, broadcastCapacity, broadcastEventUpdate, broadcastAdminUpdate };

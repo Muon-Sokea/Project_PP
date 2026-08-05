@@ -3,6 +3,7 @@ const bcrypt  = require("bcryptjs");
 const { PrismaClient } = require("@prisma/client");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const { getIO } = require("../lib/socket");
+const { broadcastAdminUpdate } = require("../lib/notify");
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -59,6 +60,7 @@ router.post("/", requireAuth, requireRole("Supervisor", "Admin"), async (req, re
     const user = await prisma.user.create({
       data: { firstName, lastName, email: email.toLowerCase(), password: hash, role },
     });
+    broadcastAdminUpdate(["users"]);
     res.status(201).json(safeUser(user));
 
     // Notify all admins that a user was created (for live dashboard updates)
@@ -84,6 +86,7 @@ router.put("/:id", requireAuth, async (req, res, next) => {
     }
 
     const user = await prisma.user.update({ where: { id: targetId }, data });
+    if (isStaff) broadcastAdminUpdate(["users"]);
     res.json(safeUser(user));
 
     // Notify all admins that a user was updated
@@ -110,6 +113,7 @@ router.delete("/:id", requireAuth, requireRole("Supervisor"), async (req, res, n
       where: { id: targetId },
       data: { deletedAt: new Date(), status: "suspended" },
     });
+    broadcastAdminUpdate(["users"]);
     res.json({ message: "User deleted." });
 
     // Notify all admins that a user was deleted

@@ -3,16 +3,11 @@ const os = require("os");
 const fs = require("fs");
 const { PrismaClient } = require("@prisma/client");
 const redis = require("../lib/redis");
-const { transporter } = require("../lib/mailer");
+const { isEmailConfigured, verifyEmailService, sendMail } = require("../lib/mailer");
 const { requireAuth, requireRole } = require("../middleware/auth");
 
 const router = express.Router();
 const prisma = new PrismaClient();
-
-function getMailer() {
-  // Check if the mailer transporter has actual SMTP credentials configured
-  return transporter?.options?.auth?.user ? transporter : null;
-}
 
 // GET /api/admin/stats  (Supervisor / Admin only)
 // Returns aggregated data for the admin dashboard overview
@@ -230,7 +225,7 @@ router.get("/system-health", requireAuth, requireRole("Supervisor", "Admin"), as
     const services = await Promise.all([
       checkWebServer(),
       checkDatabase(prisma),
-      checkEmailService(getMailer),
+      checkEmailService(),
       checkSmsService(redis),
       checkPaymentGateway(),
       checkCdnService(),
@@ -521,13 +516,12 @@ async function checkDatabase(prisma) {
   }
 }
 
-async function checkEmailService(getMailer) {
-  const mailer = getMailer();
-  if (!mailer) {
-    return { name: "Email Service", status: "not_configured", error: "SMTP credentials not set" };
+async function checkEmailService() {
+  if (!isEmailConfigured()) {
+    return { name: "Email Service", status: "not_configured", error: "SMTP/Brevo API credentials not set" };
   }
   try {
-    await mailer.verify();
+    await verifyEmailService();
     return { name: "Email Service", status: "operational" };
   } catch (err) {
     return { name: "Email Service", status: "degraded", error: err.message };
@@ -607,9 +601,8 @@ router.get("/report-data", requireAuth, requireRole("Supervisor", "Admin"), asyn
 // ─────────────────────────────────────────────────────────────────────────────
 router.post("/email-report", requireAuth, requireRole("Supervisor", "Admin"), async (req, res, next) => {
   try {
-    const mailer = getMailer();
-    if (!mailer) {
-      return res.status(503).json({ error: "Email service not configured. Set SMTP credentials in environment variables." });
+    if (!isEmailConfigured()) {
+      return res.status(503).json({ error: "Email service not configured. Set SMTP or Brevo API credentials in environment variables." });
     }
 
     const { startDate, endDate, recipientEmail } = req.body || {};
@@ -658,7 +651,7 @@ router.post("/email-report", requireAuth, requireRole("Supervisor", "Admin"), as
       </div>
     </div>`;
 
-    await transporter.sendMail({
+    await sendMail({
       from: process.env.SMTP_FROM || `"Planning Center" <${process.env.SMTP_USER}>`,
       to,
       subject: `ERMS System Report — ${dateRangeLabel}`,

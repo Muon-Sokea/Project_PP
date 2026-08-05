@@ -1,9 +1,9 @@
+const crypto = require("crypto");
 const express = require("express");
-const { v4: uuidv4 } = require("uuid");
 const { PrismaClient } = require("@prisma/client");
 const { requireAuth } = require("../middleware/auth");
 const { getIO } = require("../lib/socket");
-const { notifyUser, broadcastCapacity, broadcastEventUpdate } = require("../lib/notify");
+const { notifyUser, broadcastCapacity, broadcastEventUpdate, broadcastAdminUpdate } = require("../lib/notify");
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -106,7 +106,7 @@ router.post("/", requireAuth, async (req, res, next) => {
 
     const ticket = await prisma.ticket.create({
       data: {
-        ticketCode: uuidv4(),
+        ticketCode: crypto.randomUUID(),
         ticketType,
         quantity: qty,
         price: unitPrice,
@@ -128,6 +128,7 @@ router.post("/", requireAuth, async (req, res, next) => {
     broadcastCapacity(event.id);
     broadcastEventUpdate("capacity-changed", { id: event.id })
       .catch(err => console.warn("broadcastEventUpdate failed:", err.message));
+    broadcastAdminUpdate(["tickets", "events"]);
 
     // Push a real-time new-registration event to the organizer so their
     // dashboard updates the attendee list live without a manual refresh.
