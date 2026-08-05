@@ -67,6 +67,10 @@ export default function CreateEventPage() {
     { name: '', price: '', qty: '', desc: '' },
   ]);
 
+  // Step 3 — optional promo code (one per event)
+  const [promoCode,           setPromoCode]           = useState('');
+  const [promoDiscountPercent, setPromoDiscountPercent] = useState('');
+
   // Step 4 — agenda
   const [agenda, setAgenda] = useState([
     { time: '', session: '', speaker: '' },
@@ -108,6 +112,9 @@ export default function CreateEventPage() {
     if (Array.isArray(raw.agenda) && raw.agenda.length > 0) {
       setAgenda(raw.agenda.map(a => ({ time: a.time || '', session: a.session || '', speaker: a.speaker || '' })));
     }
+
+    if (raw.promoCode) setPromoCode(raw.promoCode);
+    if (raw.promoDiscountPercent) setPromoDiscountPercent(String(raw.promoDiscountPercent));
   }, []);
 
   // ── Progress line width ───────────────────────────────────────────────────
@@ -141,6 +148,8 @@ export default function CreateEventPage() {
         .filter(a => a.session.trim())
         .map(a => ({ time: a.time.trim(), session: a.session.trim(), speaker: a.speaker.trim() })),
       ticketTypes,
+      promoCode: promoCode.trim(),
+      promoDiscountPercent: Number(promoDiscountPercent) || 0,
     };
   }
 
@@ -401,6 +410,36 @@ export default function CreateEventPage() {
               ))}
             </div>
             <button type="button" className="ce-add-btn" onClick={addTicket}>+ Add Another Ticket Type</button>
+          </div>
+        )}
+
+        {/* ── Step 3b: Optional Promo Code ── */}
+        {step === 3 && (
+          <div className="ce-card">
+            <h1 className="ce-section-title">Promotion <span style={{ fontWeight: 400, fontSize: '0.7em', color: 'var(--text-light)' }}>(optional)</span></h1>
+            <p className="ce-section-sub">Give attendees a discount code they can enter at checkout</p>
+            <div className="ce-ticket-fields">
+              <div className="form-group" style={{ margin: 0 }}>
+                <label>Promo Code</label>
+                <input
+                  type="text" placeholder="e.g., SAVE20" value={promoCode}
+                  onChange={e => setPromoCode(e.target.value.toUpperCase())}
+                  style={{ textTransform: 'uppercase' }}
+                />
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label>Discount (%)</label>
+                <input
+                  type="number" placeholder="20" min="1" max="100" value={promoDiscountPercent}
+                  onChange={e => setPromoDiscountPercent(e.target.value)}
+                />
+              </div>
+            </div>
+            {(promoCode.trim() && !promoDiscountPercent) || (!promoCode.trim() && promoDiscountPercent) ? (
+              <p style={{ fontSize: 13, color: 'var(--warning, #d97706)', marginTop: 8 }}>
+                Both a code and a discount percentage are needed for the promotion to activate.
+              </p>
+            ) : null}
           </div>
         )}
 

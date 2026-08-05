@@ -4,8 +4,8 @@ export async function apiGetMyRegistrations() {
   return http('GET', '/registrations/mine');
 }
 
-export async function apiRegisterForEvent(eventId, { ticketTypeId, quantity = 1 } = {}) {
-  return http('POST', '/registrations', { eventId, ticketTypeId, quantity });
+export async function apiRegisterForEvent(eventId, { ticketTypeId, quantity = 1, promoCode } = {}) {
+  return http('POST', '/registrations', { eventId, ticketTypeId, quantity, promoCode });
 }
 
 export async function apiGetTicket(ticketCode) {

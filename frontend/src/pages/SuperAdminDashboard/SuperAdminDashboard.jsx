@@ -1,15 +1,19 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, memo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { loadLS, saveLS } from '../../utils/storage.js';
-import { fmtDate, fmtTime } from '../../utils/formatDate.js';
-import { apiGetAdminStats, apiGetAuditLogs, apiGetSystemHealth, apiGetHealthHistory, apiGetReportData, apiEmailReport } from '../../services/admin.service.js';
-import { apiGetAllUsers } from '../../services/user.service.js';
-import { apiGetAllEvents } from '../../services/event.service.js';
+import { fmtDate } from '../../utils/formatDate.js';
+import { apiGetAdminStats, apiGetAuditLogs, apiGetReportData, apiEmailReport } from '../../services/admin.service.js';
+import { apiGetAllUsers, apiCreateUser, apiUpdateUser, apiDeleteUser } from '../../services/user.service.js';
+import { apiGetAllEvents, apiDeleteEvent } from '../../services/event.service.js';
 import { apiGetRefunds } from '../../services/refund.service.js';
+import { useNotifications } from '../../context/NotificationContext.jsx';
 import DashboardNavbar from '../../components/layout/DashboardNavbar/DashboardNavbar.jsx';
+
 import '../../../assets/css/1_global.css';
 import '../../../assets/css/6_dashboard.css';
 import './SuperAdminDashboard.css';
-import { generatePDFReport, generateCSVReport } from '../../utils/reportExport.js';
+import { generatePDFReport, generateExcelReport } from '../../utils/reportExport.js';
+import useDeviceMetrics from '../../hooks/useDeviceMetrics.js';
 
 const SA_RESERVED = [
   { firstName:'Muon',    lastName:'Sokea',      email:'muonsokea@gmail.com',     role:'Supervisor', joined:'Jan 10, 2026' },
@@ -24,102 +28,192 @@ const AVATAR_CLR = { Supervisor:['#fef9c3','#a16207'], Admin:['#dbeafe','#1d4ed8
 
 
 
-function ChartCanvas({ id, chartData, chartLabels }) {
+const ChartCanvas = memo(function ChartCanvas({ id, chartData, chartLabels }) {
   const ref = useRef(null);
+  const chartRef = useRef(null);
   useEffect(() => {
-    let chart;
-    import('chart.js/auto').then(({ default: Chart }) => {
-      const ctx = ref.current;
-      if (!ctx) return;
-      const configs = {
-        revenueChart: {
-          type:'line',
-          data:{
-            labels: chartLabels || ['Oct','Nov','Dec','Jan','Feb','Mar'],
-            datasets:[{ data: chartData || [45000,52000,48000,60000,55000,72000], borderColor:'#4A90D9', backgroundColor:'rgba(74,144,217,0.08)', tension:0.4, fill:true, pointBackgroundColor:'#4A90D9', pointRadius:4 }],
+    const canvas = ref.current;
+    if (!canvas) return;
+
+    (async () => {
+      try {
+        const { default: Chart } = await import('chart.js/auto');
+        if (!ref.current) return;
+        const ctx = ref.current;
+        // Destroy any existing chart on this canvas before creating a new one
+        const existing = Chart.getChart(ctx);
+        if (existing) existing.destroy();
+        
+        const configs = {
+          revenueChart: {
+            type:'line',
+            data:{
+              labels: chartLabels || ['Oct','Nov','Dec','Jan','Feb','Mar'],
+              datasets:[{ data: chartData || [45000,52000,48000,60000,55000,72000], borderColor:'#4A90D9', backgroundColor:'rgba(74,144,217,0.08)', tension:0.4, fill:true, pointBackgroundColor:'#4A90D9', pointRadius:4 }],
+            },
+            options:{ plugins:{legend:{display:false}}, scales:{ y:{beginAtZero:true,grid:{color:'#f0f0f0'}}, x:{grid:{display:false}} } },
           },
-          options:{ plugins:{legend:{display:false}}, scales:{ y:{beginAtZero:true,grid:{color:'#f0f0f0'}}, x:{grid:{display:false}} } },
-        },
-        categoryChart: {
-          type:'bar',
-          data:{
-            labels: chartLabels || ['Technology','Business','Workshop','Entertainment','Sports'],
-            datasets:[{ data: chartData || [0,0,0,0,0], backgroundColor:'#4A90D9', borderRadius:4 }],
+          categoryChart: {
+            type:'bar',
+            data:{
+              labels: chartLabels || ['Technology','Business','Workshop','Entertainment','Sports'],
+              datasets:[{ data: chartData || [0,0,0,0,0], backgroundColor:'#4A90D9', borderRadius:4 }],
+            },
+            options:{ plugins:{legend:{display:false}}, scales:{ y:{beginAtZero:true,grid:{color:'#f0f0f0'}}, x:{grid:{display:false}} } },
           },
-          options:{ plugins:{legend:{display:false}}, scales:{ y:{beginAtZero:true,grid:{color:'#f0f0f0'}}, x:{grid:{display:false}} } },
-        },
-        financialChart: {
-          type:'bar',
-          data:{
-            labels: ['Oct','Nov','Dec','Jan','Feb','Mar'],
-            datasets:[
-              { label:'Revenue', data:[45000,52000,48000,60000,55000,72000], backgroundColor:'rgba(245,166,35,0.8)', borderRadius:4 },
-              { label:'Refunds', data:[1200,1800,900,2100,1500,2400],       backgroundColor:'rgba(220,53,69,0.7)',  borderRadius:4 },
-            ],
+          financialChart: {
+            type:'bar',
+            data:{
+              labels: ['Oct','Nov','Dec','Jan','Feb','Mar'],
+              datasets:[
+                { label:'Revenue', data:[45000,52000,48000,60000,55000,72000], backgroundColor:'rgba(245,166,35,0.8)', borderRadius:4 },
+                { label:'Refunds', data:[1200,1800,900,2100,1500,2400],       backgroundColor:'rgba(220,53,69,0.7)',  borderRadius:4 },
+              ],
+            },
+            options:{ plugins:{legend:{display:true,position:'top'}}, scales:{ y:{beginAtZero:true,grid:{color:'#f0f0f0'}}, x:{grid:{display:false}} } },
           },
-          options:{ plugins:{legend:{display:true,position:'top'}}, scales:{ y:{beginAtZero:true,grid:{color:'#f0f0f0'}}, x:{grid:{display:false}} } },
-        },
-        healthChart: {
-          type:'line',
-          data:{
-            labels:['00:00','04:00','08:00','12:00','16:00','20:00'],
-            datasets:[
-              { label:'CPU',    data:[60,55,50,80,75,72], borderColor:'#dc3545', tension:0.4, pointRadius:3, fill:false },
-              { label:'Memory', data:[62,60,65,75,70,68], borderColor:'#4A90D9', tension:0.4, pointRadius:3, fill:false },
-              { label:'Disk',   data:[40,41,41,42,42,42], borderColor:'#28a745', tension:0.4, pointRadius:3, fill:false },
-            ],
+          healthChart: {
+            type:'line',
+            data:{
+              labels:['00:00','04:00','08:00','12:00','16:00','20:00'],
+              datasets:[
+                { label:'CPU',    data:[60,55,50,80,75,72], borderColor:'#dc3545', tension:0.4, pointRadius:3, fill:false },
+                { label:'Memory', data:[62,60,65,75,70,68], borderColor:'#4A90D9', tension:0.4, pointRadius:3, fill:false },
+                { label:'Disk',   data:[40,41,41,42,42,42], borderColor:'#28a745', tension:0.4, pointRadius:3, fill:false },
+              ],
+            },
+            options:{ plugins:{legend:{display:true,position:'top'}}, scales:{ y:{beginAtZero:true,max:100,grid:{color:'#f0f0f0'}}, x:{grid:{display:false}} } },
           },
-          options:{ plugins:{legend:{display:true,position:'top'}}, scales:{ y:{beginAtZero:true,max:100,grid:{color:'#f0f0f0'}}, x:{grid:{display:false}} } },
-        },
-      };
-      const cfg = configs[id];
-      if (cfg) chart = new Chart(ctx, cfg);
-    }).catch(() => {});
-    return () => { if (chart) chart.destroy(); };
+        };
+        const cfg = configs[id];
+        if (cfg) chartRef.current = new Chart(ctx, cfg);
+      } catch (err) {
+        console.error('Chart.js failed to load:', err);
+      }
+    })();
+
+    return () => {
+      if (chartRef.current) {
+        chartRef.current.destroy();
+        chartRef.current = null;
+      }
+    };
   }, [id, chartData, chartLabels]);
   return <canvas ref={ref} id={id} height={id === 'healthChart' ? 120 : 180} />;
-}
+});
 
-function HealthTrendChart({ history }) {
+const HealthTrendChart = memo(function HealthTrendChart({ history }) {
   const ref = useRef(null);
+  const chartRef = useRef(null);
   useEffect(() => {
-    let chart;
-    import('chart.js/auto').then(({ default: Chart }) => {
-      const ctx = ref.current;
-      if (!ctx) return;
-      const labels = history.map(h => {
-        const d = new Date(h.ts);
-        return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-      });
-      chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels,
-          datasets: [
-            { label: 'CPU',    data: history.map(h => h.cpuUsed),  borderColor: '#dc3545', backgroundColor: 'rgba(220,53,69,0.06)', tension: 0.3, pointRadius: 2, fill: true },
-            { label: 'Memory', data: history.map(h => h.memUsed),  borderColor: '#4A90D9', backgroundColor: 'rgba(74,144,217,0.06)', tension: 0.3, pointRadius: 2, fill: true },
-            { label: 'Disk',   data: history.map(h => h.diskUsed), borderColor: '#28a745', backgroundColor: 'rgba(40,167,69,0.06)', tension: 0.3, pointRadius: 2, fill: true },
-            { label: 'Load',   data: history.map(h => h.loadAvg),  borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.06)', tension: 0.3, pointRadius: 2, fill: true },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: true,
-          plugins: { legend: { position: 'top', labels: { boxWidth: 12, padding: 12, font: { size: 11 } } } },
-          scales: {
-            y: { beginAtZero: true, max: 100, grid: { color: '#f0f0f0' }, ticks: { callback: v => v + '%' } },
-            x: { grid: { display: false }, ticks: { maxTicksLimit: 10, font: { size: 10 } } },
+    if (!ref.current || !history?.length) return;
+    (async () => {
+      try {
+        const { default: Chart } = await import('chart.js/auto');
+        if (!ref.current) return;
+        const ctx = ref.current;
+        // Destroy any existing chart on this canvas before creating a new one
+        const existing = Chart.getChart(ctx);
+        if (existing) existing.destroy();
+        
+        const labels = history.map(h => {
+          const d = new Date(h.ts);
+          return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        });
+        chartRef.current = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              { label: 'CPU',    data: history.map(h => h.cpuUsed),  borderColor: '#dc3545', backgroundColor: 'rgba(220,53,69,0.06)', tension: 0.3, pointRadius: 2, fill: true },
+              { label: 'Memory', data: history.map(h => h.memUsed),  borderColor: '#4A90D9', backgroundColor: 'rgba(74,144,217,0.06)', tension: 0.3, pointRadius: 2, fill: true },
+              { label: 'Disk',   data: history.map(h => h.diskUsed), borderColor: '#28a745', backgroundColor: 'rgba(40,167,69,0.06)', tension: 0.3, pointRadius: 2, fill: true },
+              { label: 'Load',   data: history.map(h => h.loadAvg),  borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.06)', tension: 0.3, pointRadius: 2, fill: true },
+            ],
           },
-        },
-      });
-    }).catch(() => {});
-    return () => chart?.destroy();
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            animation: false,
+            plugins: { legend: { position: 'top', labels: { boxWidth: 12, padding: 12, font: { size: 11 } } } },
+            scales: {
+              y: { beginAtZero: true, max: 100, grid: { color: '#f0f0f0' }, ticks: { callback: v => v + '%' } },
+              x: { grid: { display: false }, ticks: { maxTicksLimit: 10, font: { size: 10 } } },
+            },
+          },
+        });
+      } catch (err) {
+        console.error('HealthTrendChart: Chart.js failed:', err);
+      }
+    })();
+    return () => {
+      if (chartRef.current) {
+        chartRef.current.destroy();
+        chartRef.current = null;
+      }
+    };
   }, [history]);
   return <canvas ref={ref} height={200} />;
-}
+});
+
+const ClientHealthChart = memo(function ClientHealthChart({ history }) {
+  const ref = useRef(null);
+  const chartRef = useRef(null);
+  useEffect(() => {
+    if (!ref.current || !history?.length) return;
+    (async () => {
+      try {
+        const { default: Chart } = await import('chart.js/auto');
+        if (!ref.current) return;
+        const ctx = ref.current;
+        // Destroy any existing chart on this canvas before creating a new one
+        const existing = Chart.getChart(ctx);
+        if (existing) existing.destroy();
+        
+        const labels = history.map(h => {
+          const d = new Date(h.ts);
+          return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        });
+        chartRef.current = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              { label: 'CPU',     data: history.map(h => h.cpu),     borderColor: '#dc3545', backgroundColor: 'rgba(220,53,69,0.06)', tension: 0.3, pointRadius: 0, fill: true },
+              { label: 'Memory',  data: history.map(h => h.memory),  borderColor: '#4A90D9', backgroundColor: 'rgba(74,144,217,0.06)', tension: 0.3, pointRadius: 0, fill: true },
+              { label: 'Battery', data: history.map(h => h.battery ?? 0), borderColor: '#28a745', backgroundColor: 'rgba(40,167,69,0.06)', tension: 0.3, pointRadius: 0, fill: true },
+              { label: 'Network', data: history.map(h => h.network  ?? 0), borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.06)', tension: 0.3, pointRadius: 0, fill: true },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            animation: false,
+            plugins: { legend: { position: 'top', labels: { boxWidth: 12, padding: 12, font: { size: 11 } } } },
+            scales: {
+              y: { beginAtZero: true, max: 100, grid: { color: '#f0f0f0' }, ticks: { callback: v => v + '%' } },
+              x: { grid: { display: false }, ticks: { maxTicksLimit: 10, font: { size: 9.5 } } },
+            },
+          },
+        });
+      } catch (err) {
+        console.error('ClientHealthChart: Chart.js failed:', err);
+      }
+    })();
+    return () => {
+      if (chartRef.current) {
+        chartRef.current.destroy();
+        chartRef.current = null;
+      }
+    };
+  }, [history]);
+  return <canvas ref={ref} height={200} />;
+});
 
 export default function SuperAdminDashboard() {
+  const navigate = useNavigate();
   const [activeTab,    setActiveTab]    = useState('overview');
+  const { socket } = useNotifications();
 
   // Admin stats from API
   const [adminStats, setAdminStats] = useState(null);
@@ -131,80 +225,151 @@ export default function SuperAdminDashboard() {
   const [apiRefunds, setApiRefunds] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
 
-  // Audit logs & system health
+  // Client device metrics — only polls when Health tab is active
+  const { deviceMetrics, deviceInfo, history: deviceHistory, error: deviceError } = useDeviceMetrics({
+    pollInterval: 10000,
+    maxHistory: 20,
+    enabled: activeTab === 'health',
+  });
+
+  // Audit logs
   const [auditLogs, setAuditLogs] = useState([]);
-  const [systemHealth, setSystemHealth] = useState(null);
-  const [healthHistory, setHealthHistory] = useState([]);
   const [loadingAudit, setLoadingAudit] = useState(true);
-  const [loadingHealth, setLoadingHealth] = useState(true);
-  const [lastHealthCheck, setLastHealthCheck] = useState(null);
 
+  // ── Initial load: only fetch what the Overview and Financial tabs need ──
   useEffect(() => {
-    async function loadStats() {
+    async function loadInitial() {
       try {
-        const data = await apiGetAdminStats();
-        setAdminStats(data);
-      } catch (err) {
-        console.error('Failed to load admin stats:', err);
-      } finally {
-        setLoadingStats(false);
-      }
-    }
-    loadStats();
-  }, []);
-
-  // Load real users, events, refunds for other tabs
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const [users, events, refunds, audit, health, history] = await Promise.all([
-          apiGetAllUsers().catch(() => []),
-          apiGetAllEvents().catch(() => []),
-          apiGetRefunds().catch(() => []),
-          apiGetAuditLogs().catch(() => []),
-          apiGetSystemHealth().catch(() => null),
-          apiGetHealthHistory(50).catch(() => []),
+        const [stats, events, refunds] = await Promise.all([
+          apiGetAdminStats(),
+          apiGetAllEvents(),
+          apiGetRefunds(),
         ]);
-        setApiUsers(Array.isArray(users) ? users : []);
+        setAdminStats(stats);
         setApiAllEvents(Array.isArray(events) ? events : []);
         setApiRefunds(Array.isArray(refunds) ? refunds : []);
-        setAuditLogs(Array.isArray(audit) ? audit : []);
-        setSystemHealth(health);
-        setHealthHistory(Array.isArray(history) ? history : []);
-        setLastHealthCheck(new Date().toISOString());
-      } catch {} finally {
+      } catch (err) {
+        console.error('Failed to load initial data:', err);
+      } finally {
+        setLoadingStats(false);
         setLoadingData(false);
-        setLoadingAudit(false);
-        setLoadingHealth(false);
       }
     }
-    loadData();
-
-    // Auto-refresh health every 60 seconds
-    const interval = setInterval(async () => {
-      try {
-        const [health, history] = await Promise.all([
-          apiGetSystemHealth().catch(() => null),
-          apiGetHealthHistory(50).catch(() => []),
-        ]);
-        if (health) setSystemHealth(health);
-        if (Array.isArray(history)) setHealthHistory(history);
-        setLastHealthCheck(new Date().toISOString());
-      } catch {}
-    }, 60000);
-
-    return () => clearInterval(interval);
+    loadInitial();
   }, []);
+
+  // ── Lazy-load: fetch users when the Users tab becomes active ───────────
+  useEffect(() => {
+    // Lazy-load users when the Users tab becomes active
+    if (activeTab !== 'users') return;
+    if (apiUsers.length > 0) return;
+    apiGetAllUsers()
+      .then(data => setApiUsers(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, [activeTab, apiUsers.length]);
+
+  // ── Lazy-load: fetch audit logs when the Audit tab becomes active ──────
+  useEffect(() => {
+    if (activeTab !== 'audit') return;
+    if (auditLogs.length > 0) return;
+    setLoadingAudit(true);
+    apiGetAuditLogs()
+      .then(data => setAuditLogs(Array.isArray(data) ? data : []))
+      .catch(() => [])
+      .finally(() => setLoadingAudit(false));
+  }, [activeTab, auditLogs.length]);
+
+
+
+  // ── Real-time socket listeners (debounced to prevent API spam) ─────────
+  // Keeps the Super Admin Dashboard live — refreshes events, users, refunds,
+  // and stats when changes happen anywhere on the platform.
+  const debTimers = useRef({});
+  function debounceSocket(key, fn, delay = 3000) {
+    if (debTimers.current[key]) return;
+    debTimers.current[key] = setTimeout(() => {
+      fn();
+      delete debTimers.current[key];
+    }, delay);
+  }
+
+  useEffect(() => {
+    if (!socket) return;
+
+    function refreshAll() {
+      apiGetAllEvents()
+        .then(data => setApiAllEvents(Array.isArray(data) ? data : []))
+        .catch(() => {});
+      apiGetAdminStats()
+        .then(data => setAdminStats(data))
+        .catch(() => {});
+    }
+
+    function onUserUpdate() {
+      apiGetAllUsers()
+        .then(data => setApiUsers(Array.isArray(data) ? data : []))
+        .catch(() => {});
+      apiGetAdminStats()
+        .then(data => setAdminStats(data))
+        .catch(() => {});
+    }
+
+    function onNotification(notification) {
+      if (notification.type === 'refund_requested' || notification.type === 'refund_resolved') {
+        apiGetRefunds()
+          .then(data => setApiRefunds(Array.isArray(data) ? data : []))
+          .catch(() => {});
+        apiGetAdminStats()
+          .then(data => setAdminStats(data))
+          .catch(() => {});
+      }
+    }
+
+    const debouncedRefresh = () => debounceSocket('event', refreshAll, 3000);
+    const debouncedUser = () => debounceSocket('user', onUserUpdate, 3000);
+    const debouncedNotif = (n) => debounceSocket('notif', () => onNotification(n), 3000);
+
+    socket.on('event-update', debouncedRefresh);
+    socket.on('user-update', debouncedUser);
+    socket.on('notification', debouncedNotif);
+
+    return () => {
+      socket.off('event-update', debouncedRefresh);
+      socket.off('user-update', debouncedUser);
+      socket.off('notification', debouncedNotif);
+      // Clear any pending debounce timers
+      Object.values(debTimers.current).forEach(t => clearTimeout(t));
+      debTimers.current = {};
+    };
+  }, [socket]);
+
+  // ── Periodic auto-refresh (stats) ─────────────────────────────────────
+  // Refreshes overview/financial stats every 30s as a safety net.
+  useEffect(() => {
+    const statsInterval = setInterval(async () => {
+      try {
+        const data = await apiGetAdminStats();
+        if (data) setAdminStats(data);
+      } catch {}
+    }, 30000);
+    return () => clearInterval(statsInterval);
+  }, []);
+
+
 
   const [roleFilter,   setRoleFilter]   = useState('all');
   const [userSearch,   setUserSearch]   = useState('');
   const [eventFilter,  setEventFilter]  = useState('all');
   const [eventSearch,  setEventSearch]  = useState('');
   const [auditSearch,  setAuditSearch]  = useState('');
-  const [modal,        setModal]        = useState(null); // 'create' | 'delete'
+  const [modal,        setModal]        = useState(null); // 'create' | 'edit' | 'delete'
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [createForm,   setCreateForm]   = useState({ firstName:'', lastName:'', email:'', password:'', role:'Admin' });
   const [createErr,    setCreateErr]    = useState('');
+  const [editTarget,   setEditTarget]   = useState(null); // email of user being edited
+  const [editRole,     setEditRole]     = useState('Attendee');
+  const [editStatus,   setEditStatus]   = useState('active');
+  const [editErr,      setEditErr]      = useState('');
   const [tick,         setTick]         = useState(0);
 
   const [settings,     setSettings]     = useState({ emailNotif:true, smsNotif:true, pushNotif:false, autoBackup:true, twoFactor:true, forceReset:false, sessionTimeout:'30 minutes', passwordComplexity:'High', maxLogin:'3 attempts' });
@@ -220,7 +385,7 @@ export default function SuperAdminDashboard() {
     try { return JSON.parse(localStorage.getItem('erms_user')); } catch { return null; }
   }, [tick]);
 
-  const getUsers = useCallback(() => {
+  const allUsers = useMemo(() => {
     const ov   = loadLS(OVER_KEY, {});
     const reserved = SA_RESERVED.map(u => {
       const o = ov[u.email] || {};
@@ -247,23 +412,24 @@ export default function SuperAdminDashboard() {
     });
     return Array.from(byEmail.values());
   }, [tick, apiUsers]);
-
-  const allUsers = getUsers();
   const myEmail = (user?.email || '').toLowerCase();
 
+  // ── Lazy computed data ─────────────────────────────────────────────────
+  // Only compute filtered data when its tab is active to avoid unnecessary work.
   const filteredUsers = useMemo(() => {
+    if (activeTab !== 'users') return allUsers;
     const q = userSearch.toLowerCase();
     return allUsers.filter(u => {
-      const name = `${u.firstName} ${u.lastName}`.trim();
+      const name = `${u.firstName || ''} ${u.lastName || ''}`.trim();
       const roleOk = roleFilter === 'all' || u.role === roleFilter;
-      return roleOk && (name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
+      return roleOk && (name.toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q));
     });
-  }, [allUsers, roleFilter, userSearch]);
+  }, [allUsers, roleFilter, userSearch, activeTab]);
 
   const computedEvents = useMemo(() => {
     const ov = loadLS('erms_event_overrides', {});
     return apiAllEvents.map(e => {
-      const regCount = Number(e._count?.tickets || 0);
+      const regCount = Number(e.registered || e.attending || 0);
       const rev = regCount * Number(e.price || 0);
       const cap = Number(e.capacity) || 0;
       const st = cap > 0 && regCount >= cap ? 'Full' : 'Available';
@@ -285,26 +451,47 @@ export default function SuperAdminDashboard() {
   }, [apiAllEvents]);
 
   const filteredEvents = useMemo(() => {
+    if (activeTab !== 'events') return computedEvents;
     const q = eventSearch.toLowerCase();
     return computedEvents.filter(e => {
       const statusOk = eventFilter === 'all' || e.status === eventFilter;
-      return statusOk && (e.title.toLowerCase().includes(q) || e.organizer.toLowerCase().includes(q) || e.category.toLowerCase().includes(q));
+      return statusOk && ((e.title || '').toLowerCase().includes(q) || (e.organizer || '').toLowerCase().includes(q) || (e.category || '').toLowerCase().includes(q));
     });
-  }, [computedEvents, eventFilter, eventSearch]);
+  }, [computedEvents, eventFilter, eventSearch, activeTab]);
 
   const filteredAudit = useMemo(() => {
+    if (activeTab !== 'audit') return auditLogs;
     const q = auditSearch.toLowerCase();
     if (!q) return auditLogs;
-    return auditLogs.filter(r => (r.user + r.action + r.role + r.ip).toLowerCase().includes(q));
-  }, [auditLogs, auditSearch]);
+    return auditLogs.filter(r => ((r.user || '') + (r.action || '') + (r.role || '') + (r.ip || '')).toLowerCase().includes(q));
+  }, [auditLogs, auditSearch, activeTab]);
 
-  const loadingUsers = loadingData && allUsers.length === 0;
-  const loadingEventsData = loadingData && apiAllEvents.length === 0;
+  const loadingEventsData = apiAllEvents.length === 0;
 
-  function toggleSuspend(email) {
-    const u = getUsers().find(u => u.email.toLowerCase() === email.toLowerCase());
+  async function toggleSuspend(email) {
+    const u = allUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
     if (!u) return;
     const next = u.status === 'Suspended' ? 'Active' : 'Suspended';
+
+    // For real database users, call the API
+    if (u.src === 'database') {
+      // Find the real API user to get their ID
+      const apiUser = apiUsers.find(au => au.email.toLowerCase() === email.toLowerCase());
+      if (apiUser) {
+        try {
+          await apiUpdateUser(apiUser.id, { status: next === 'Active' ? 'active' : 'suspended' });
+          // Refresh users from API
+          const refreshed = await apiGetAllUsers();
+          setApiUsers(Array.isArray(refreshed) ? refreshed : []);
+          return;
+        } catch (err) {
+          console.error('Failed to update user status:', err);
+          return;
+        }
+      }
+    }
+
+    // Fallback: localStorage user management
     if (u.src === 'attendee') {
       const list = loadLS('erms_attendees', []);
       const i = list.findIndex(a => (a.email||'').toLowerCase() === email.toLowerCase());
@@ -317,15 +504,82 @@ export default function SuperAdminDashboard() {
     setTick(t => t + 1);
   }
 
+  function openEdit(email) {
+    const u = allUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+    if (!u) return;
+    setEditTarget(email);
+    setEditRole(u.role || 'Attendee');
+    setEditStatus(u.status === 'Suspended' ? 'suspended' : 'active');
+    setEditErr('');
+    setModal('edit');
+  }
+
+  async function saveEdit() {
+    if (!editTarget) { setModal(null); return; }
+    const u = allUsers.find(u => u.email.toLowerCase() === editTarget.toLowerCase());
+    if (!u) { setModal(null); return; }
+    setEditErr('');
+
+    // For real database users, call the API
+    if (u.src === 'database') {
+      const apiUser = apiUsers.find(au => au.email.toLowerCase() === editTarget.toLowerCase());
+      if (apiUser) {
+        try {
+          await apiUpdateUser(apiUser.id, { role: editRole, status: editStatus });
+          const refreshed = await apiGetAllUsers();
+          setApiUsers(Array.isArray(refreshed) ? refreshed : []);
+          setModal(null);
+          setEditTarget(null);
+        } catch (err) {
+          setEditErr(err.message || 'Failed to update user.');
+        }
+      }
+      return;
+    }
+
+    // Fallback: localStorage user management
+    const statusLabel = editStatus === 'suspended' ? 'Suspended' : 'Active';
+    if (u.src === 'attendee') {
+      const list = loadLS('erms_attendees', []);
+      const i = list.findIndex(a => (a.email||'').toLowerCase() === editTarget.toLowerCase());
+      if (i !== -1) { list[i].role = editRole; list[i].status = statusLabel; saveLS('erms_attendees', list); }
+    } else {
+      const ov = loadLS(OVER_KEY, {});
+      ov[u.email] = { ...(ov[u.email]||{}), role: editRole, status: statusLabel };
+      saveLS(OVER_KEY, ov);
+    }
+    setModal(null);
+    setEditTarget(null);
+    setTick(t => t + 1);
+  }
+
   function openDelete(email) {
     setDeleteTarget(email);
     setModal('delete');
   }
 
-  function confirmDelete() {
+  async function confirmDelete() {
     if (!deleteTarget) { setModal(null); return; }
-    const u = getUsers().find(u => u.email.toLowerCase() === deleteTarget.toLowerCase());
+    const u = allUsers.find(u => u.email.toLowerCase() === deleteTarget.toLowerCase());
     if (u) {
+      // For real database users, call the API
+      if (u.src === 'database') {
+        const apiUser = apiUsers.find(au => au.email.toLowerCase() === deleteTarget.toLowerCase());
+        if (apiUser) {
+          try {
+            await apiDeleteUser(apiUser.id);
+            const refreshed = await apiGetAllUsers();
+            setApiUsers(Array.isArray(refreshed) ? refreshed : []);
+          } catch (err) {
+            console.error('Failed to delete user:', err);
+            alert(err.message || 'Failed to delete user.');
+          }
+          setModal(null);
+          setDeleteTarget(null);
+          return;
+        }
+      }
+      // Fallback: localStorage user management
       if (u.src === 'attendee') {
         saveLS('erms_attendees', loadLS('erms_attendees', []).filter(a => (a.email||'').toLowerCase() !== deleteTarget.toLowerCase()));
       } else {
@@ -339,23 +593,30 @@ export default function SuperAdminDashboard() {
     setTick(t => t + 1);
   }
 
-  function createUser() {
+  async function createUser() {
     setCreateErr('');
     const { firstName, lastName, email, password, role } = createForm;
     if (!firstName || !lastName || !email || !password) { setCreateErr('Please fill in all required fields.'); return; }
     if (password.length < 6) { setCreateErr('Password must be at least 6 characters.'); return; }
     if (!/\S+@\S+\.\S+/.test(email)) { setCreateErr('Please enter a valid email address.'); return; }
     const lc = email.toLowerCase();
-    if (getUsers().some(u => u.email.toLowerCase() === lc)) { setCreateErr('An account with this email already exists.'); return; }
-    const list = loadLS('erms_attendees', []);
-    list.push({ id: Date.now(), firstName, lastName, email: lc, role, status:'Active', joined: fmtDate(new Date()) });
-    saveLS('erms_attendees', list);
+    if (allUsers.some(u => u.email.toLowerCase() === lc)) { setCreateErr('An account with this email already exists.'); return; }
+
+    try {
+      // Create via API so it reaches the Prisma database
+      await apiCreateUser({ firstName, lastName, email: lc, password, role });
+      const refreshed = await apiGetAllUsers();
+      setApiUsers(Array.isArray(refreshed) ? refreshed : []);
+    } catch (err) {
+      setCreateErr(err.message || 'Failed to create user via API.');
+      return;
+    }
+
     setCreateForm({ firstName:'', lastName:'', email:'', password:'', role:'Admin' });
     setModal(null);
-    setTick(t => t + 1);
   }
 
-  const deleteUser = deleteTarget ? getUsers().find(u => u.email.toLowerCase() === deleteTarget.toLowerCase()) : null;
+  const deleteUser = deleteTarget ? allUsers.find(u => u.email.toLowerCase() === deleteTarget.toLowerCase()) : null;
 
   // ── Report Handlers ──────────────────────────────────────────────────────
   async function fetchReportData(forceRefresh = false) {
@@ -378,32 +639,38 @@ export default function SuperAdminDashboard() {
   }
 
   async function handleExportPDF() {
+    if (reportGenerating) return; // guard: prevent double-click
     setReportGenerating('pdf');
     try {
       const data = await fetchReportData(true);
-      if (data) {
-        const filename = await generatePDFReport(data);
-        alert(`PDF report downloaded: ${filename}`);
+      if (!data) {
+        console.error('fetchReportData returned null — API might have failed');
+        return;
       }
+      const filename = await generatePDFReport(data);
+      alert(`PDF report downloaded: ${filename}`);
     } catch (err) {
       console.error('PDF generation failed:', err);
-      alert('Failed to generate PDF report.');
+      alert('Failed to generate PDF report. Check console for details.');
     } finally {
       setReportGenerating(null);
     }
   }
 
   async function handleExportCSV() {
+    if (reportGenerating) return; // guard: prevent double-click
     setReportGenerating('csv');
     try {
       const data = await fetchReportData(true);
-      if (data) {
-        const filename = generateCSVReport(data);
-        alert(`CSV report downloaded: ${filename}`);
+      if (!data) {
+        console.error('fetchReportData returned null — API might have failed');
+        return;
       }
+      const filename = await generateExcelReport(data);
+      alert(`Excel report downloaded: ${filename}`);
     } catch (err) {
-      console.error('CSV generation failed:', err);
-      alert('Failed to generate CSV report.');
+      console.error('Excel generation failed:', err);
+      alert('Failed to generate Excel report. Check console for details.');
     } finally {
       setReportGenerating(null);
     }
@@ -430,6 +697,44 @@ export default function SuperAdminDashboard() {
 
   const hasDateRange = reportStartDate || reportEndDate;
 
+  // ── Memoized chart data (prevents unnecessary Chart.js re-initialization) ─
+  const monthlyRevLabels = useMemo(
+    () => adminStats?.monthlyRevenue?.map(m => m.month),
+    [adminStats?.monthlyRevenue]
+  );
+  const monthlyRevData = useMemo(
+    () => adminStats?.monthlyRevenue?.map(m => m.revenue),
+    [adminStats?.monthlyRevenue]
+  );
+  const categoryLabels = useMemo(
+    () => adminStats?.eventsByCategory?.map(c => c.category),
+    [adminStats?.eventsByCategory]
+  );
+  const categoryData = useMemo(
+    () => adminStats?.eventsByCategory?.map(c => c.count),
+    [adminStats?.eventsByCategory]
+  );
+
+  // ── Memoized financial cards (extracted from IIFE) ──────────────────────
+  const financialCards = useMemo(() => {
+    if (!adminStats) return [];
+    const totalRev = adminStats.totalRevenue || 0;
+    const totalReg = adminStats.totalRegistrations || 0;
+    const monthlyRev = adminStats.monthlyRevenue || [];
+    const thisMonth = monthlyRev.length > 0 ? monthlyRev[monthlyRev.length - 1]?.revenue || 0 : 0;
+    const avgPrice = totalReg > 0 ? Math.round(totalRev / totalReg) : 0;
+    const refundCount = apiRefunds.filter(r => r.status === 'approved' || r.status === 'rejected').length;
+    const netRev = totalRev;
+    return [
+      { label:'Total Revenue',     value:`$${totalRev.toLocaleString()}`,  trend:`${totalReg} tickets sold`, up:true },
+      { label:'This Month',         value:`$${thisMonth.toLocaleString()}`, trend:`${monthlyRev.length > 1 ? ((thisMonth / (monthlyRev[monthlyRev.length - 2]?.revenue || 1) - 1) * 100).toFixed(0) : 0}% vs last month`, up:thisMonth >= (monthlyRev[monthlyRev.length - 2]?.revenue || 0) },
+      { label:'Total Tickets Sold', value:totalReg.toLocaleString(),        trend:'Across all events', up:true },
+      { label:'Avg. Ticket Price',  value:`$${avgPrice}`,                   trend:'Per ticket', up:true },
+      { label:'Refunds',            value:`${refundCount}`,                  trend:`${apiRefunds.filter(r => r.status === 'pending').length} pending`, up:false },
+      { label:'Net Revenue',        value:`$${netRev.toLocaleString()}`,     trend:'After all transactions', up:netRev >= 0 },
+    ];
+  }, [adminStats, apiRefunds]);
+
   return (
     <>
       {/* ── Navbar ── */}
@@ -442,13 +747,13 @@ export default function SuperAdminDashboard() {
             <h1>System Administrator Dashboard</h1>
             <p>Complete platform control and monitoring</p>
           </div>
-          <div style={{ display:'flex', gap:'10px', alignItems:'center' }}>
-            {user && <span style={{ fontSize:'13px', color:'var(--text-medium)' }}>Welcome, {user.firstName} {user.lastName}</span>}
-            <button className="btn btn-outline btn-sm" onClick={handleExportPDF} disabled={loadingReport || reportGenerating === 'pdf'}>
+          <div style={{ display:'flex', gap:'10px', alignItems:'center', flexShrink:0 }}>
+            {user && <span style={{ fontSize:'13px', color:'var(--text-medium)', whiteSpace:'nowrap' }}>Welcome, {user.firstName} {user.lastName}</span>}
+            <button type="button" className="btn btn-outline btn-sm" onClick={handleExportPDF} disabled={loadingReport || reportGenerating === 'pdf'} style={{ minWidth:140 }}>
               {reportGenerating === 'pdf' ? <><i className="ri-loader-4-line ri-spin" /> Generating...</> : <><i className="ri-file-pdf-line" /> Export PDF</>}
             </button>
-            <button className="btn btn-outline btn-sm" onClick={handleExportCSV} disabled={loadingReport || reportGenerating === 'csv'}>
-              {reportGenerating === 'csv' ? <><i className="ri-loader-4-line ri-spin" /> Generating...</> : <><i className="ri-file-excel-line" /> Export CSV</>}
+            <button type="button" className="btn btn-outline btn-sm" onClick={handleExportCSV} disabled={loadingReport || reportGenerating === 'csv'} style={{ minWidth:140 }}>
+              {reportGenerating === 'csv' ? <><i className="ri-loader-4-line ri-spin" /> Generating...</> : <><i className="ri-file-excel-line" /> Export Excel</>}
             </button>
           </div>
         </div>
@@ -524,8 +829,8 @@ export default function SuperAdminDashboard() {
                       <div className="chart-wrap">
                         <ChartCanvas
                           id="revenueChart"
-                          chartLabels={adminStats?.monthlyRevenue?.map(m => m.month)}
-                          chartData={adminStats?.monthlyRevenue?.map(m => m.revenue)}
+                          chartLabels={monthlyRevLabels}
+                          chartData={monthlyRevData}
                         />
                       </div>
                     </div>
@@ -534,16 +839,14 @@ export default function SuperAdminDashboard() {
                       <div className="chart-wrap">
                         <ChartCanvas
                           id="categoryChart"
-                          chartLabels={adminStats?.eventsByCategory?.map(c => c.category)}
-                          chartData={adminStats?.eventsByCategory?.map(c => c.count)}
+                          chartLabels={categoryLabels}
+                          chartData={categoryData}
                         />
                       </div>
                     </div>
-                  </div>
-
-                  <div className="card" style={{ padding:'20px' }}>
+                  </div><div className="card" style={{ padding:'20px', width:'100%' }}>
                     <div className="sa-section-header">
-                      <div className="section-title" style={{ margin:0 }}>Recent Registrations</div>
+                        <div className="section-title" style={{ margin:0 }}>Recent Registrations</div>
                     </div>
                     <div style={{ overflowX:'auto' }}>
                       <table className="data-table">
@@ -648,6 +951,9 @@ export default function SuperAdminDashboard() {
                                 {(isSelf || isSA)
                                   ? <span style={{ fontSize:'11px', color:'var(--text-light)' }}>{isSA && isSelf ? 'You · Protected' : isSelf ? 'You' : 'Protected'}</span>
                                   : <div className="action-btns">
+                                      <button className="btn btn-outline btn-sm" title="Edit Role / Status" onClick={() => openEdit(u.email)}>
+                                        <i className="ri-edit-line" />
+                                      </button>
                                       <button className="btn btn-outline btn-sm" title={u.status === 'Suspended' ? 'Unsuspend' : 'Suspend'} onClick={() => toggleSuspend(u.email)}>
                                         <i className={u.status === 'Suspended' ? 'ri-check-line' : 'ri-forbid-line'} />
                                       </button>
@@ -724,8 +1030,21 @@ export default function SuperAdminDashboard() {
                                   localStorage.setItem('erms_selected_event', JSON.stringify(e));
                                   window.open(`/events/${e.id}`, '_blank');
                                 }}><i className="ri-eye-line" /></button>
-                                <button className="btn btn-outline btn-sm" title="Edit" onClick={() => alert(`Edit: ${e.title}`)}><i className="ri-edit-line" /></button>
-                                <button className="btn btn-danger btn-sm" title="Delete" onClick={() => alert(`Delete ${e.title}`)}><i className="ri-delete-bin-line" /></button>
+                                <button className="btn btn-outline btn-sm" title="Edit" onClick={() => {
+                                  localStorage.setItem('erms_edit_event', JSON.stringify(e));
+                                  navigate('/create-event');
+                                }}><i className="ri-edit-line" /></button>
+                                <button className="btn btn-danger btn-sm" title="Delete" onClick={async () => {
+                                  if (!window.confirm(`Delete "${e.title}"? This cannot be undone.`)) return;
+                                  try {
+                                    await apiDeleteEvent(e.id);
+                                    const refreshed = await apiGetAllEvents();
+                                    setApiAllEvents(Array.isArray(refreshed) ? refreshed : []);
+                                    window.dispatchEvent(new CustomEvent('erms:events-updated'));
+                                  } catch (err) {
+                                    alert('Failed to delete event: ' + (err.message || 'Unknown error'));
+                                  }
+                                }}><i className="ri-delete-bin-line" /></button>
                               </div>
                             </td>
                           </tr>
@@ -750,45 +1069,29 @@ export default function SuperAdminDashboard() {
                 <>
                   <div className="sa-section-header">
                     <div className="section-title" style={{ margin:0 }}>Financial Reports</div>
-                    <button className="btn btn-outline btn-sm" onClick={handleExportCSV} disabled={reportGenerating === 'csv'}>
-                      {reportGenerating === 'csv' ? <><i className="ri-loader-4-line ri-spin" /> Generating...</> : <><i className="ri-file-excel-line" /> Export CSV</>}
+                    <button type="button" className="btn btn-outline btn-sm" onClick={handleExportCSV} disabled={reportGenerating === 'csv'}>
+                      {reportGenerating === 'csv' ? <><i className="ri-loader-4-line ri-spin" /> Generating...</> : <><i className="ri-file-excel-line" /> Export Excel</>}
                     </button>
                   </div>
 
                   <div className="financial-cards">
-                    {(() => {
-                      const totalRev = adminStats?.totalRevenue || 0;
-                      const totalReg = adminStats?.totalRegistrations || 0;
-                      const monthlyRev = adminStats?.monthlyRevenue || [];
-                      const thisMonth = monthlyRev.length > 0 ? monthlyRev[monthlyRev.length - 1]?.revenue || 0 : 0;
-                      const avgPrice = totalReg > 0 ? Math.round(totalRev / totalReg) : 0;
-                      const refundCount = apiRefunds.filter(r => r.status === 'approved' || r.status === 'rejected').length;
-                      const netRev = totalRev;
-                      return [
-                        { label:'Total Revenue',     value:`$${totalRev.toLocaleString()}`,  trend:`${totalReg} tickets sold`, up:true },
-                        { label:'This Month',         value:`$${thisMonth.toLocaleString()}`, trend:`${monthlyRev.length > 1 ? ((thisMonth / (monthlyRev[monthlyRev.length - 2]?.revenue || 1) - 1) * 100).toFixed(0) : 0}% vs last month`, up:thisMonth >= (monthlyRev[monthlyRev.length - 2]?.revenue || 0) },
-                        { label:'Total Tickets Sold', value:totalReg.toLocaleString(),        trend:`Across all events`, up:true },
-                        { label:'Avg. Ticket Price',  value:`$${avgPrice}`,                   trend:`Per ticket`, up:true },
-                        { label:'Refunds',            value:`${refundCount}`,                  trend:`${apiRefunds.filter(r => r.status === 'pending').length} pending`, up:false },
-                        { label:'Net Revenue',        value:`$${netRev.toLocaleString()}`,     trend:`After all transactions`, up:netRev >= 0 },
-                      ].map((c, i) => (
-                        <div className="financial-card" key={i}>
-                          <div className="f-label">{c.label}</div>
-                          <div className="f-value">{c.value}</div>
-                          <div className={c.up ? 'f-trend' : 'f-down'}>
-                            <i className={`ri-arrow-${c.up ? 'up' : 'down'}-line`} /> {c.trend}
-                          </div>
+                    {financialCards.map((c, i) => (
+                      <div className="financial-card" key={i}>
+                        <div className="f-label">{c.label}</div>
+                        <div className="f-value">{c.value}</div>
+                        <div className={c.up ? 'f-trend' : 'f-down'}>
+                          <i className={`ri-arrow-${c.up ? 'up' : 'down'}-line`} /> {c.trend}
                         </div>
-                      ));
-                    })()}
+                      </div>
+                    ))}
                   </div>
 
                   <div className="chart-card" style={{ marginBottom:'20px' }}>
                     <h3>Monthly Revenue Breakdown</h3>
                     <ChartCanvas
                       id="financialChart"
-                      chartLabels={adminStats?.monthlyRevenue?.map(m => m.month)}
-                      chartData={adminStats?.monthlyRevenue?.map(m => m.revenue)}
+                      chartLabels={monthlyRevLabels}
+                      chartData={monthlyRevData}
                     />
                   </div>
 
@@ -906,7 +1209,7 @@ export default function SuperAdminDashboard() {
                         <i className="ri-search-line" />
                         <input type="text" placeholder="Search logs..." value={auditSearch} onChange={e => setAuditSearch(e.target.value)} />
                       </div>
-                          <button className="btn btn-outline btn-sm" onClick={handleExportCSV} disabled={reportGenerating === 'csv'}>
+                          <button type="button" className="btn btn-outline btn-sm" onClick={handleExportCSV} disabled={reportGenerating === 'csv'}>
                       {reportGenerating === 'csv' ? <><i className="ri-loader-4-line ri-spin" /> Generating...</> : <><i className="ri-download-line" /> Export</>}
                     </button>
                     </div>
@@ -937,103 +1240,171 @@ export default function SuperAdminDashboard() {
             </div>
           )}
 
-          {/* ── TAB 7: SYSTEM HEALTH ── */}
+          {/* ── TAB 7: DEVICE HEALTH (real-time client-side metrics) ── */}
           {activeTab === 'health' && (
             <div className="tab-content active">
-              {loadingHealth ? (
-                <div style={{ textAlign:'center', padding:'60px 0', color:'var(--text-light)' }}>
-                  <i className="ri-loader-4-line ri-spin" style={{ fontSize:32 }} />
-                  <p style={{ marginTop:12 }}>Loading system health…</p>
+              <div className="sa-section-header">
+                <div className="section-title" style={{ margin:0 }}>
+                  <i className="ri-smartphone-line" style={{ marginRight:8 }} /> Device Health Monitoring
                 </div>
-              ) : (
-                <>
-                  <div className="sa-section-header">
-                    <div className="section-title" style={{ margin:0 }}>System Health Monitoring</div>
-                    <div style={{ display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap' }}>
-                      {lastHealthCheck && (
-                        <span style={{ fontSize:'12px', color:'var(--text-light)' }}>
-                          <i className="ri-time-line" /> Last check: {fmtTime(lastHealthCheck)}
-                        </span>
-                      )}
-                      <button className="btn btn-outline btn-sm" onClick={() => {
-                        setLoadingHealth(true);
-                        Promise.all([
-                          apiGetSystemHealth(),
-                          apiGetHealthHistory(50),
-                        ]).then(([health, history]) => {
-                          setSystemHealth(health);
-                          setHealthHistory(Array.isArray(history) ? history : []);
-                          setLastHealthCheck(new Date().toISOString());
-                          setLoadingHealth(false);
-                        }).catch(() => setLoadingHealth(false));
-                      }}>
-                        <i className="ri-refresh-line" /> Refresh
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="health-cards" style={{ marginBottom:'20px' }}>
-                    {[
-                      { label:'CPU Usage',     value: `${systemHealth?.cpu?.used ?? 0}%`,  pct: systemHealth?.cpu?.used ?? 0,  color: (systemHealth?.cpu?.used ?? 0) > 80 ? 'var(--danger)' : (systemHealth?.cpu?.used ?? 0) > 60 ? 'var(--warning)' : 'var(--success)' },
-                      { label:'Memory Usage',  value: `${systemHealth?.memory?.used ?? 0}%`, pct: systemHealth?.memory?.used ?? 0, color: (systemHealth?.memory?.used ?? 0) > 80 ? 'var(--danger)' : (systemHealth?.memory?.used ?? 0) > 60 ? 'var(--warning)' : 'var(--success)' },
-                      { label:'Disk Usage',    value: `${systemHealth?.disk?.used ?? 0}%`,  pct: systemHealth?.disk?.used ?? 0,  color: (systemHealth?.disk?.used ?? 0) > 85 ? 'var(--danger)' : (systemHealth?.disk?.used ?? 0) > 70 ? 'var(--warning)' : 'var(--success)' },
-                      { label:'System Load',   value: `${systemHealth?.network?.load ?? 0}%`, pct: systemHealth?.network?.load ?? 0, color: (systemHealth?.network?.load ?? 0) > 80 ? 'var(--danger)' : (systemHealth?.network?.load ?? 0) > 60 ? 'var(--warning)' : 'var(--info)' },
-                    ].map((h, i) => (
-                      <div className="health-card" key={i}>
-                        <div className="health-label">{h.label}</div>
-                        <div className="health-value" style={{ color:h.color }}>{h.value}</div>
-                        <div className="health-bar"><div className="health-fill" style={{ width:`${h.pct}%`, background:h.color }} /></div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Historical trend chart */}
-                  {healthHistory.length > 1 && (
-                    <div className="chart-card" style={{ marginBottom:'20px' }}>
-                      <h3>Resource Usage History ({healthHistory.length} records)</h3>
-                      <HealthTrendChart history={healthHistory} />
-                    </div>
+                <div style={{ display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap' }}>
+                  <span style={{ fontSize:'12px', color:'var(--text-light)' }}>
+                    <i className="ri-time-line" /> Live — {deviceHistory.length} snapshots
+                  </span>
+                  <span style={{ fontSize:'11px', background:'var(--bg-secondary,#f1f5f9)', padding:'4px 10px', borderRadius:'6px', color:'var(--text-medium)' }}>
+                    <i className="ri-refresh-line" /> Every 2s
+                  </span>
+                  {deviceError && (
+                    <span style={{ fontSize:'11px', color:'var(--danger)' }}>
+                      <i className="ri-error-warning-line" /> {deviceError}
+                    </span>
                   )}
+                </div>
+              </div>
 
-                  <div className="health-grid">
-                    <div className="card">
-                      <div style={{ fontSize:'15px', fontWeight:600, marginBottom:'12px' }}>Service Status</div>
-                      {(systemHealth?.services || []).map((svc, i, arr) => {
-                        const name = svc.name || svc;
-                        const status = svc.status || 'operational';
-                        const isOk = status === 'operational';
-                        return (
-                          <div className="service-row" key={name} style={i === arr.length - 1 ? { border:'none' } : {}}>
-                            <span>{name}</span>
-                            <span className={isOk ? 'service-ok' : 'service-bad'}>
-                              <i className={`ri-${isOk ? 'checkbox-circle' : 'alert'}-line`} /> {status.charAt(0).toUpperCase() + status.slice(1)}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="card">
-                      <div style={{ fontSize:'15px', fontWeight:600, marginBottom:'12px' }}>System Info</div>
-                      {[
-                        ['Hostname',   systemHealth?.system?.hostname || '—'],
-                        ['Platform',   systemHealth?.system?.platform || '—'],
-                        ['Node.js',    systemHealth?.system?.nodeVersion || '—'],
-                        ['CPU Cores',  `${systemHealth?.cpu?.cores || '—'} × ${(systemHealth?.cpu?.model || '').split('(')[0].trim() || '—'}`],
-                        ['Uptime',     systemHealth?.network?.uptimeHours ? `${systemHealth.network.uptimeHours} hours` : '—'],
-                        ['Memory',     systemHealth?.memory?.total ? `${(systemHealth.memory.total / 1073741824).toFixed(1)} GB` : '—'],
-                      ].map(([k, v], i, arr) => (
-                        <div className="service-row" key={k} style={i === arr.length - 1 ? { border:'none' } : {}}>
-                          <span>{k}</span><span>{v}</span>
+              <div className="health-cards" style={{ marginBottom:'20px' }}>
+                {(() => {
+                  const cpuPct = deviceMetrics.cpu;
+                  const memPct = deviceMetrics.memory;
+                  const batPct = deviceMetrics.battery;
+                  const netSpeed = deviceMetrics.networkSpeed;
+
+                  // Network display
+                  const netLabel = deviceMetrics.network === 'unknown'
+                    ? (navigator.onLine ? 'Connected' : 'Offline')
+                    : `${deviceMetrics.network.toUpperCase()} · ${netSpeed} Mbps`;
+
+                  return [
+                    {
+                      icon:'ri-cpu-line',
+                      label:'CPU Usage',
+                      value: `${cpuPct}%`,
+                      pct: cpuPct,
+                      sub: `${deviceInfo.cores} cores`,
+                      color: cpuPct > 70 ? 'var(--danger)' : cpuPct > 40 ? 'var(--warning)' : 'var(--success)',
+                    },
+                    {
+                      icon:'ri-ram-line',
+                      label:'Memory (JS Heap)',
+                      value: memPct > 0 ? `${memPct}%` : deviceMetrics.memoryTotal > 0 ? `${(deviceMetrics.memoryTotal / 1073741824).toFixed(1)} GB` : 'N/A',
+                      pct: memPct || 0,
+                      sub: deviceInfo.deviceMemory ? `${deviceInfo.deviceMemory} GB device` : '—',
+                      color: memPct > 70 ? 'var(--danger)' : memPct > 40 ? 'var(--warning)' : 'var(--info)',
+                    },
+                    {
+                      icon:'ri-battery-2-line',
+                      label:'Battery',
+                      value: batPct !== null ? `${batPct}%` : 'N/A',
+                      pct: batPct !== null ? batPct : 0,
+                      sub: batPct !== null
+                        ? (deviceMetrics.batteryCharging ? '⚡ Charging' : `${batPct}% remaining`)
+                        : 'Not available',
+                      color: batPct !== null
+                        ? (batPct < 20 ? 'var(--danger)' : batPct < 40 ? 'var(--warning)' : 'var(--success)')
+                        : 'var(--text-light)',
+                    },
+                    {
+                      icon:'ri-wifi-line',
+                      label:'Network',
+                      value: netLabel,
+                      pct: netSpeed > 0 ? Math.min(100, Math.round((netSpeed / 10) * 100)) : 0,
+                      sub: navigator.onLine ? 'Online' : 'Offline',
+                      color: navigator.onLine ? 'var(--success)' : 'var(--danger)',
+                    },
+                  ].map((h, i) => (
+                    <div className="health-card" key={i}>
+                      <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'4px' }}>
+                        <i className={h.icon} style={{ fontSize:'16px', color:h.color }} />
+                        <div className="health-label" style={{ margin:0 }}>{h.label}</div>
+                      </div>
+                      <div className="health-value" style={{ color:h.color, fontSize: h.label === 'Network' ? '16px' : '22px' }}>{h.value}</div>
+                      {h.label !== 'Network' && (
+                        <div className="health-bar" style={{ marginBottom:4 }}>
+                          <div className="health-fill" style={{ width:`${h.pct}%`, background:h.color }} />
                         </div>
-                      ))}
+                      )}
+                      <div style={{ fontSize:'11px', color:'var(--text-light)' }}>{h.sub}</div>
                     </div>
-                  </div>
+                  ));
+                })()}
+              </div>
 
-                  <div style={{ fontSize:'11px', color:'var(--text-light)', textAlign:'center', marginTop:'20px' }}>
-                    Auto-refreshes every 60 seconds
+              {/* Storage usage card */}
+              {deviceMetrics.storage !== null && (
+                <div className="card" style={{ padding:'16px 20px', marginBottom:'20px' }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px' }}>
+                    <i className="ri-database-2-line" style={{ color:'var(--primary)', fontSize:'16px' }} />
+                    <span style={{ fontSize:'14px', fontWeight:600 }}>Browser Storage Usage</span>
+                    <span style={{ fontSize:'12px', color:'var(--text-light)', marginLeft:'auto' }}>
+                      {deviceMetrics.storage}% used
+                    </span>
                   </div>
-                </>
+                  <div className="health-bar" style={{ height:6 }}>
+                    <div className="health-fill" style={{
+                      width:`${deviceMetrics.storage}%`,
+                      background: deviceMetrics.storage > 80 ? 'var(--danger)' : deviceMetrics.storage > 50 ? 'var(--warning)' : 'var(--info)',
+                    }} />
+                  </div>
+                  <div style={{ fontSize:'11px', color:'var(--text-light)', marginTop:'6px' }}>
+                    {deviceMetrics.storageUsage > 0
+                      ? `${(deviceMetrics.storageUsage / 1073741824).toFixed(1)} GB of ${(deviceMetrics.storageQuota / 1073741824).toFixed(1)} GB`
+                      : 'Storage estimate not available'}
+                  </div>
+                </div>
               )}
+
+              {/* Historical trend chart */}
+              {deviceHistory.length > 2 && (
+                <div className="chart-card" style={{ marginBottom:'20px' }}>
+                  <h3>Device Metrics Over Time ({deviceHistory.length} snapshots)</h3>
+                  <ClientHealthChart history={deviceHistory} />
+                </div>
+              )}
+
+              <div className="health-grid">
+                <div className="card">
+                  <div style={{ fontSize:'15px', fontWeight:600, marginBottom:'12px', display:'flex', alignItems:'center', gap:'8px' }}>
+                    <i className="ri-computer-line" style={{ color:'var(--primary)' }} /> Device Information
+                  </div>
+                  {[
+                    ['Operating System', deviceInfo.os],
+                    ['Browser',          deviceInfo.browser],
+                    ['CPU Cores',        deviceInfo.cores > 0 ? `${deviceInfo.cores} cores` : '—'],
+                    ['Device Memory',    deviceInfo.deviceMemory > 0 ? `${deviceInfo.deviceMemory} GB` : '—'],
+                    ['Screen',           deviceInfo.screen],
+                    ['Platform',         deviceInfo.platform],
+                  ].map(([k, v], i, arr) => (
+                    <div className="service-row" key={k} style={i === arr.length - 1 ? { border:'none' } : {}}>
+                      <span>{k}</span>
+                      <span style={{ fontWeight:500, color:'var(--text-dark)' }}>{v}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="card">
+                  <div style={{ fontSize:'15px', fontWeight:600, marginBottom:'12px', display:'flex', alignItems:'center', gap:'8px' }}>
+                    <i className="ri-signal-wifi-line" style={{ color:'var(--success)' }} /> Network & Status
+                  </div>
+                  {[
+                    ['Online Status', navigator.onLine
+                      ? <span style={{ color:'var(--success)' }}><i className="ri-checkbox-circle-line" /> Online</span>
+                      : <span style={{ color:'var(--danger)' }}><i className="ri-close-circle-line" /> Offline</span>],
+                    ['Connection Type', deviceMetrics.network !== 'unknown' ? deviceMetrics.network.toUpperCase() : '—'],
+                    ['Downlink Speed', deviceMetrics.networkSpeed > 0 ? `${deviceMetrics.networkSpeed} Mbps` : '—'],
+                    ['Battery Level', deviceMetrics.battery !== null ? `${deviceMetrics.battery}%` : '—'],
+                    ['Charging', deviceMetrics.batteryCharging ? 'Yes ⚡' : 'No'],
+                    ['Snapshots Collected', `${deviceHistory.length} records`],
+                  ].map(([k, v], i, arr) => (
+                    <div className="service-row" key={k} style={i === arr.length - 1 ? { border:'none' } : {}}>
+                      <span>{k}</span>
+                      <span>{v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ fontSize:'11px', color:'var(--text-light)', textAlign:'center', marginTop:'20px' }}>
+                <i className="ri-refresh-line" /> Updates every 2 seconds · tracks <strong>this device</strong>
+              </div>
             </div>
           )}
 
@@ -1124,7 +1495,7 @@ export default function SuperAdminDashboard() {
                     <span><i className="ri-check-line" /> Registration Trends</span>
                     <span><i className="ri-check-line" /> Detailed Data Tables</span>
                   </div>
-                  <button
+                  <button type="button"
                     className="btn btn-primary btn-full"
                     onClick={handleExportPDF}
                     disabled={loadingReport || reportGenerating === 'pdf'}
@@ -1151,7 +1522,7 @@ export default function SuperAdminDashboard() {
                     <span><i className="ri-check-line" /> Refunds & Testimonials</span>
                     <span><i className="ri-check-line" /> Monthly Analytics</span>
                   </div>
-                  <button
+                  <button type="button"
                     className="btn btn-success btn-full"
                     onClick={handleExportCSV}
                     disabled={loadingReport || reportGenerating === 'csv'}
@@ -1177,12 +1548,11 @@ export default function SuperAdminDashboard() {
                     <span><i className="ri-check-line" /> Revenue & Ticket Stats</span>
                     <span><i className="ri-check-line" /> Sent to Your Email</span>
                     <span><i className="ri-check-line" /> Respects Date Filter</span>
-                  </div>
-                  <button
-                    className="btn btn-primary btn-full"
-                    onClick={handleEmailReport}
-                    disabled={loadingReport || reportGenerating === 'email'}
-                  >
+                  </div>                    <button type="button"
+                      className="btn btn-primary btn-full"
+                      onClick={handleEmailReport}
+                      disabled={loadingReport || reportGenerating === 'email'}
+                    >
                     {reportGenerating === 'email' ? (
                       <><i className="ri-loader-4-line ri-spin" /> Sending Email...</>
                     ) : (
@@ -1269,6 +1639,37 @@ export default function SuperAdminDashboard() {
           <div className="sa-modal-actions">
             <button className="btn btn-outline" onClick={() => setModal(null)}>Cancel</button>
             <button className="btn btn-primary" onClick={createUser}><i className="ri-user-add-line" /> Create User</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Edit User Modal */}
+      <div className={`sa-modal-overlay${modal === 'edit' ? ' show' : ''}`} onClick={e => { if (e.target === e.currentTarget) setModal(null); }}>
+        <div className="sa-modal-box">
+          <div className="sa-modal-head">
+            <div className="sa-modal-icon info"><i className="ri-edit-line" /></div>
+            <h3>Edit User</h3>
+            <button className="m-close" onClick={() => setModal(null)}>&times;</button>
+          </div>
+          <p className="sa-modal-text" style={{ marginBottom: 4 }}>
+            Editing <strong>{editTarget || ''}</strong>
+          </p>
+          <label className="sa-field-label">Role</label>
+          <select className="sa-field-select" value={editRole} onChange={e => setEditRole(e.target.value)}>
+            <option value="Attendee">Attendee</option>
+            <option value="Organizer">Organizer</option>
+            <option value="Admin">Admin</option>
+            <option value="Supervisor">Super Admin</option>
+          </select>
+          <label className="sa-field-label">Status</label>
+          <select className="sa-field-select" value={editStatus} onChange={e => setEditStatus(e.target.value)}>
+            <option value="active">Active</option>
+            <option value="suspended">Suspended</option>
+          </select>
+          {editErr && <div style={{ fontSize:'13px', color:'#dc2626', marginTop:'8px' }}>{editErr}</div>}
+          <div className="sa-modal-actions">
+            <button className="btn btn-outline" onClick={() => setModal(null)}>Cancel</button>
+            <button className="btn btn-primary" onClick={saveEdit}><i className="ri-save-line" /> Save Changes</button>
           </div>
         </div>
       </div>

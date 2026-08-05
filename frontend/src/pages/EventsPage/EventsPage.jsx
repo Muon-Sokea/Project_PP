@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { apiGetEvents } from '../../services/event.service.js';
 import { apiGetTestimonials } from '../../services/testimonial.service.js';
 import { apiGetBookmarks, apiBookmarkEvent, apiUnbookmarkEvent } from '../../services/bookmark.service.js';
+import { apiGetContactInfo } from '../../services/settings.service.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useScrollListener } from '../../hooks/useScrollListener.js';
 import { fmtDate } from '../../utils/formatDate.js';
@@ -122,6 +123,9 @@ function EventCard({ event, index, onClick, onBookmark, isBookmarked }) {
         <span className={`badge ${status === 'Full' ? 'badge-full' : 'badge-available'}`}>
           {status}
         </span>
+        {event.promoCode && event.promoDiscountPercent > 0 && (
+          <span className="badge badge-promo"><i className="ri-price-tag-3-fill" /> {event.promoDiscountPercent}% OFF</span>
+        )}
       </div>
       <div className="event-card-body">
         <div className="event-category">
@@ -146,9 +150,18 @@ function EventCard({ event, index, onClick, onBookmark, isBookmarked }) {
           </div>
         </div>
         <div className="event-card-footer">
-          <span className="event-price">
-            {Number(event.price) === 0 ? 'Free' : `$${Number(event.price)}`}
-          </span>
+          {event.promoCode && event.promoDiscountPercent > 0 ? (
+            <span className="event-price">
+              <span style={{ textDecoration: 'line-through', color: 'var(--text-light)', fontSize: '0.85em', marginRight: 6 }}>
+                {Number(event.price) === 0 ? 'Free' : `$${Number(event.price)}`}
+              </span>
+              {Number(event.price) === 0 ? 'Free' : `$${(Number(event.price) * (1 - event.promoDiscountPercent / 100)).toFixed(2)}`}
+            </span>
+          ) : (
+            <span className="event-price">
+              {Number(event.price) === 0 ? 'Free' : `$${Number(event.price)}`}
+            </span>
+          )}
           <span className="event-attendees">
             <i className="ri-group-line" />
             {(event.attending ?? 0).toLocaleString()} attending
@@ -170,6 +183,7 @@ export default function EventsPage() {
   const [totalAttendees, setTotalAttendees] = useState(0);
   const [satisfactionRate, setSatisfactionRate] = useState(0);
   const [testimonials,  setTestimonials]  = useState([]);
+  const [contactPhone,  setContactPhone]  = useState('');
 
   // bookmarks
   const [bookmarkedIds, setBookmarkedIds] = useState(() => {
@@ -213,6 +227,10 @@ export default function EventsPage() {
       })
       .catch(() => setEvents([]));
   }
+
+  useEffect(() => {
+    apiGetContactInfo().then(data => setContactPhone(data.phone || '')).catch(() => {});
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -430,6 +448,11 @@ export default function EventsPage() {
     };
   }, []);
 
+  // ── Active promotions (shown on the hero banner) ───────────────────────────
+  const promotedEvents = useMemo(() => (
+    events.filter(e => e.promoCode && e.promoDiscountPercent > 0).slice(0, 3)
+  ), [events]);
+
   // ── Filter / pagination helpers ────────────────────────────────────────────
   const filteredEvents = useMemo(() => {
     let list = events;
@@ -549,12 +572,20 @@ export default function EventsPage() {
           <button className="btn btn-primary" onClick={() => setNavOpen(false)}>
             <i className="ri-home-line" /> Home
           </button>
-          <button className="btn btn-outline" onClick={() => { setNavOpen(false); goToDashboard(); }}>
-            <i className="ri-dashboard-line" /> Dashboard
-          </button>
-          <button className="btn btn-outline" onClick={() => { setNavOpen(false); logout(); }}>
-            <i className="ri-logout-box-r-line" /> Logout
-          </button>
+          {user ? (
+            <>
+              <button className="btn btn-outline" onClick={() => { setNavOpen(false); goToDashboard(); }}>
+                <i className="ri-dashboard-line" /> Dashboard
+              </button>
+              <button className="btn btn-outline" onClick={() => { setNavOpen(false); logout(); }}>
+                <i className="ri-logout-box-r-line" /> Logout
+              </button>
+            </>
+          ) : (
+            <button className="btn btn-outline" onClick={() => { setNavOpen(false); navigate('/login'); }}>
+              <i className="ri-login-box-line" /> Sign In
+            </button>
+          )}
 
           {user && (
             <button
@@ -655,6 +686,18 @@ export default function EventsPage() {
               </ul>
             )}
           </div>
+
+          {promotedEvents.length > 0 && (
+            <div className="hero-promo-strip" aria-label="Current promotions">
+              {promotedEvents.map(ev => (
+                <button key={ev.id} className="hero-promo-card" onClick={() => viewEvent(ev)}>
+                  <span className="hero-promo-pct">{ev.promoDiscountPercent}% OFF</span>
+                  <span className="hero-promo-title">{ev.title}</span>
+                  <span className="hero-promo-code">Code: {ev.promoCode}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="hero-dots">
           {[0, 1, 2, 3].map(i => (
@@ -784,7 +827,11 @@ export default function EventsPage() {
         </div>
         <div className="testi-rows" id="testiRows">
           {(() => {
-            const displayReviews = testimonials.length > 0 ? testimonials : FALLBACK_REVIEWS;
+            // Cap the marquee to a reasonable number of cards — the scroll
+            // animation has a fixed duration, so an unbounded count (the DB
+            // can easily accumulate 100+) would make the loop scroll far
+            // too fast to read.
+            const displayReviews = (testimonials.length > 0 ? testimonials : FALLBACK_REVIEWS).slice(0, 15);
             return prefersReducedMotion ? (
               <div className="t-grid">
                 {displayReviews.map(r => <TestiCard key={r.id} r={r} isClone={false} />)}
@@ -859,8 +906,8 @@ export default function EventsPage() {
             <h4 className="footer-heading">Contact Us</h4>
             <ul className="footer-links">
               <li><i className="ri-map-pin-line" /> Russian Federation Blvd, Phnom Penh, Cambodia</li>
-              <li><i className="ri-phone-line" /> +855 23 123 456</li>
-              <li><i className="ri-mail-line" /> support@planningcenter.com</li>
+              {contactPhone && <li><i className="ri-phone-line" /> {contactPhone}</li>}
+              <li><i className="ri-mail-line" /> planningcenterofficial@gmail.com</li>
               <li><i className="ri-time-line" /> Mon – Fri, 8:00 AM – 5:00 PM</li>
             </ul>
           </div>
@@ -885,6 +932,7 @@ export default function EventsPage() {
           <i className="ri-arrow-up-line" />
         </button>
       )}
+
     </>
   );
 }

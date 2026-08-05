@@ -43,4 +43,12 @@ async function broadcastCapacity(eventId) {
   } catch { /* socket.io not initialized (e.g. in tests) */ }
 }
 
-module.exports = { notifyUser, notifyRoles, broadcastCapacity };
+// Broadcasts an event-related change to ALL connected clients so the home
+// page (EventsPage) can refresh the list in real-time without a manual reload.
+async function broadcastEventUpdate(action, eventData) {
+  try {
+    getIO().emit("event-update", { action, event: eventData });
+  } catch { /* socket.io not initialized (e.g. in tests) */ }
+}
+
+module.exports = { notifyUser, notifyRoles, broadcastCapacity, broadcastEventUpdate };

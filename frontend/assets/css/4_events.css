@@ -75,6 +75,9 @@
   position: absolute;
   top: 10px; left: 10px;
 }
+.event-card-img .badge-promo {
+  left: auto; right: 10px;
+}
 
 /* ── Bookmark Button on Event Cards ── */
 .bookmark-btn {

@@ -138,7 +138,7 @@ export default function ForgotPasswordPage() {
       <main className="gm-main">
         <div className="card fp-card">
 
-          <button className="fp-back" onClick={goBack}>
+          <button className="auth-back" onClick={goBack}>
             <i className="ri-arrow-left-line" /> Back to sign in
           </button>
 
@@ -176,10 +176,10 @@ export default function ForgotPasswordPage() {
           <div className={`fp-form-step${step === 2 ? ' active' : ''}`}>
             <h1>Verify your email</h1>
             <p className="sub">We sent a 6-digit code to <strong>{email}</strong></p>
-            <div className="fp-otp-row">
+            <div className="otp-row">
               {otp.map((digit, i) => (
                 <input
-                  key={i} type="text" inputMode="numeric" className={`fp-otp-input${digit ? ' filled' : ''}`}
+                  key={i} type="text" inputMode="numeric" className={`otp-input${digit ? ' filled' : ''}`}
                   maxLength={1} value={digit}
                   ref={el => { otpRefs.current[i] = el; }}
                   onChange={e => handleOtpChange(i, e.target.value)}
@@ -187,7 +187,7 @@ export default function ForgotPasswordPage() {
                 />
               ))}
             </div>
-            {otpErr && <div className="fp-otp-error">{otpErr}</div>}
+            {otpErr && <div className="otp-error">{otpErr}</div>}
             <p className="sub" style={{ fontSize: '0.82rem', color: 'var(--text-light)', marginTop: 4 }}>
               Check the server console for the code (no email service in dev).
             </p>
@@ -196,9 +196,9 @@ export default function ForgotPasswordPage() {
               <span className="label">Verify code</span>
               <span className="check" aria-hidden="true"><i className="ri-check-line" /></span>
             </button>
-            <p className="fp-resend">
+            <p className="auth-resend">
               Didn't get it?{' '}
-              <span className="fp-resend-link" onClick={resendCode}>{resendLabel}</span>
+              <button className="auth-resend-link" onClick={resendCode}>{resendLabel}</button>
             </p>
           </div>
 

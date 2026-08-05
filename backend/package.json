@@ -9,7 +9,7 @@
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio --port 5555"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
@@ -21,12 +21,13 @@
     "ioredis": "^5.4.1",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.2.0",
+    "node-cron": "^4.6.0",
     "nodemailer": "^9.0.3",
     "socket.io": "^4.8.3",
     "uuid": "^14.0.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.4",
+    "nodemon": "^3.1.14",
     "prisma": "^6.19.3"
   },
   "allowScripts": {

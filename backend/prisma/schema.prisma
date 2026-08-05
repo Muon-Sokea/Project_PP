@@ -55,6 +55,11 @@ model User {
   notificationPrefs Json    @default("{}")
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+  // Soft delete: Supervisor "delete" hides the account everywhere in the app
+  // (login blocked, excluded from user lists) but never removes it or its
+  // related tickets/events/refunds/testimonials/bookmarks — those stay intact
+  // as evidence and still appear in PDF/CSV report exports.
+  deletedAt     DateTime?
 
   events        Event[]       @relation("OrganizerEvents")
   tickets       Ticket[]
@@ -62,6 +67,22 @@ model User {
   testimonials  Testimonial[]
   bookmarks     Bookmark[]
   notifications Notification[]
+  loginEvents   LoginEvent[]
+}
+
+// One row per successful login (password/Google/Telegram) — powers the real
+// "Security Activity" feed. No geo-IP lookup and no session revocation by
+// design (see backend/src/routes/settings.js for the IP/device parsing).
+model LoginEvent {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  ip        String   @default("")
+  device    String   @default("")
+  method    String   @default("password")
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 model Event {
@@ -76,6 +97,10 @@ model Event {
   category        String         @default("General")
   image           String         @default("")
   agenda          Json           @default("[]")
+  // Optional organizer-set discount promo — one per event, redeemed at
+  // checkout in EventRegistrationPage. Null/0 means no active promotion.
+  promoCode            String?
+  promoDiscountPercent Int?
   published       Boolean        @default(false)
   approvalStatus  ApprovalStatus @default(PENDING)
   createdAt       DateTime       @default(now())
@@ -130,8 +155,10 @@ model Ticket {
   ticketType   String       @default("standard")
   quantity     Int          @default(1)
   price        Decimal      @default(0) @db.Decimal(10, 2)
+  promoCodeUsed String?     // the code applied at checkout, if any — kept for the record even if the event's code later changes
   status       TicketStatus @default(confirmed)
   registeredAt DateTime     @default(now())
+  reminderSentAt DateTime?  // set once the "1 day before" reminder email goes out — prevents duplicate sends
 
   user         User         @relation(fields: [userId], references: [id])
   userId       Int

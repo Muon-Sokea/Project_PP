@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import ErrorBoundary from '../components/ErrorBoundary.jsx';
 
 // ── Lazy-loaded pages ──────────────────────────────────────────────────────
 const EventsPage            = lazy(() => import('../pages/EventsPage/EventsPage.jsx'));
@@ -44,6 +45,7 @@ const Loading = () => (
 
 export default function AppRoutes() {
   return (
+    <ErrorBoundary>
     <Suspense fallback={<Loading />}>
       <Routes>
         {/* Public */}
@@ -54,7 +56,7 @@ export default function AppRoutes() {
         <Route path="/register"           element={<GuestRoute><RegisterPage /></GuestRoute>} />
         <Route path="/event-registration" element={<EventRegistrationPage />} />
         <Route path="/forgot-password"    element={<GuestRoute><ForgotPasswordPage /></GuestRoute>} />
-        <Route path="/privacy-policy"     element={<PrivacyPolicyPage />} />
+        <Route path="/privacy"            element={<PrivacyPolicyPage />} />
         <Route path="/terms"              element={<TermsPage />} />
 
         {/* Protected — Attendee */}
@@ -88,7 +90,9 @@ export default function AppRoutes() {
         {/* Protected — Supervisor */}
         <Route path="/superadmin" element={
           <PrivateRoute roles={['Supervisor']}>
-            <SuperAdminDashboard />
+            <ErrorBoundary>
+              <SuperAdminDashboard />
+            </ErrorBoundary>
           </PrivateRoute>
         } />
 
@@ -114,5 +118,6 @@ export default function AppRoutes() {
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
+    </ErrorBoundary>
   );
 }

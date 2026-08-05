@@ -40,6 +40,12 @@ export function NotificationProvider({ children }) {
       setUnreadCount(prev => prev + 1);
     });
 
+    // ── Relay event updates to the DOM so pages that listen for
+    //    `erms:events-updated` (e.g., EventsPage) refresh in real-time.
+    sock.on('event-update', (payload) => {
+      window.dispatchEvent(new CustomEvent('erms:events-updated', { detail: payload }));
+    });
+
     return () => {
       sock.disconnect();
       socketRef.current = null;

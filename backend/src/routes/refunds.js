@@ -1,7 +1,8 @@
 const express = require("express");
 const { PrismaClient } = require("@prisma/client");
 const { requireAuth, requireRole } = require("../middleware/auth");
-const { notifyUser, notifyRoles, broadcastCapacity } = require("../lib/notify");
+const { notifyUser, notifyRoles, broadcastCapacity, broadcastEventUpdate } = require("../lib/notify");
+const { sendRefundUpdateEmail } = require("../lib/mailer");
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -27,6 +28,8 @@ router.post("/", requireAuth, async (req, res, next) => {
     // Mark ticket as cancelled — this frees the seat immediately
     await prisma.ticket.update({ where: { ticketCode }, data: { status: "cancelled" } });
     broadcastCapacity(ticket.eventId);
+    broadcastEventUpdate("capacity-changed", { id: ticket.eventId })
+      .catch(err => console.warn("broadcastEventUpdate failed:", err.message));
 
     notifyRoles(["Admin", "Supervisor"], {
       type: "refund_requested",
@@ -59,7 +62,10 @@ router.patch("/:ticketCode", requireAuth, requireRole("Supervisor", "Admin"), as
     if (!["approved", "rejected"].includes(status))
       return res.status(400).json({ error: "status must be 'approved' or 'rejected'." });
 
-    const refund = await prisma.refund.findUnique({ where: { ticketCode: req.params.ticketCode } });
+    const refund = await prisma.refund.findUnique({
+      where: { ticketCode: req.params.ticketCode },
+      include: { user: { select: { email: true, notificationPrefs: true } } },
+    });
     if (!refund) return res.status(404).json({ error: "Refund not found." });
 
     const updated = await prisma.refund.update({
@@ -73,6 +79,16 @@ router.patch("/:ticketCode", requireAuth, requireRole("Supervisor", "Admin"), as
       message: `Your refund for "${refund.eventName}" was ${status}.`,
       link: `/dashboard`,
     }).catch(err => console.warn("notifyUser failed:", err.message));
+
+    const refundUpdatesOn = refund.user?.notificationPrefs?.refundUpdates !== false; // default on
+    if (refundUpdatesOn && refund.user?.email) {
+      sendRefundUpdateEmail(refund.user.email, {
+        eventName: refund.eventName,
+        ticketCode: refund.ticketCode,
+        status,
+        reason: refund.reason,
+      }).catch(err => console.warn("sendRefundUpdateEmail failed:", err.message));
+    }
 
     res.json(updated);
   } catch (err) { next(err); }

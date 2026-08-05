@@ -290,6 +290,11 @@ export default function EventDetailPage() {
             <div className="detail-img-grad" />
             <span className="detail-cat-glass">{event.category}</span>
             <div className="detail-price-tag">${event.price}</div>
+            {event.promoCode && event.promoDiscountPercent > 0 && (
+              <span className="badge badge-promo" style={{ position: 'absolute', top: 10, right: 10 }}>
+                <i className="ri-price-tag-3-fill" /> {event.promoDiscountPercent}% OFF
+              </span>
+            )}
           </div>
           <div className="detail-info">
             <div>
@@ -306,7 +311,18 @@ export default function EventDetailPage() {
                 </div>
               </div>
               <div className="price-row">
-                <div className="detail-meta-item"><i className="ri-price-tag-3-line" /><span>${event.price} per ticket</span></div>
+                <div className="detail-meta-item">
+                  <i className="ri-price-tag-3-line" />
+                  {event.promoCode && event.promoDiscountPercent > 0 ? (
+                    <span>
+                      <span style={{ textDecoration: 'line-through', color: 'var(--text-light)', marginRight: 6 }}>${event.price}</span>
+                      <strong>${(Number(event.price) * (1 - event.promoDiscountPercent / 100)).toFixed(2)}</strong> per ticket
+                      {' '}<span className="badge badge-promo" style={{ marginLeft: 6 }}>Code: {event.promoCode}</span>
+                    </span>
+                  ) : (
+                    <span>${event.price} per ticket</span>
+                  )}
+                </div>
                 <div className="detail-meta-item"><i className="ri-group-line" /><span>{attending.toLocaleString()} / {capacity.toLocaleString()} attendees</span></div>
               </div>
               <div className="avail-row">

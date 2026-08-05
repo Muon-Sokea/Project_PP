@@ -1,10 +1,17 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import '../../../assets/css/1_global.css';
 import '../../../assets/css/2_navbar.css';
 import '../LegalPage.css';
 
 export default function TermsPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Opened from the registration flow (?from=register) → Back returns there
+  // specifically, since these links open in a new tab and have no history to
+  // go back to. Otherwise fall back to normal browser back navigation.
+  const goBack = () => searchParams.get('from') === 'register'
+    ? navigate('/register')
+    : navigate(-1);
 
   return (
     <>
@@ -14,20 +21,13 @@ export default function TermsPage() {
           <span className="logo-bottom">Center</span>
         </Link>
         <div className="nav-links">
-          <button className="btn btn-outline" onClick={() => navigate(-1)}>
+          <button className="btn btn-primary" onClick={goBack}>
             <i className="ri-arrow-left-line" /> Back
           </button>
-          <Link to="/" className="btn btn-primary">
-            <i className="ri-home-line" /> Home
-          </Link>
         </div>
       </nav>
 
       <main className="legal-wrap">
-        <button className="legal-back" onClick={() => navigate(-1)}>
-          <i className="ri-arrow-left-s-line" /> Close
-        </button>
-
         <div className="legal-header">
           <div className="legal-badge"><i className="ri-file-list-3-line" /> Legal</div>
           <h1>Terms &amp; Conditions</h1>
@@ -120,7 +120,7 @@ export default function TermsPage() {
           <p style={{ marginBottom: 18 }}>For questions regarding these Terms and Conditions:</p>
           <div className="legal-contact-row">
             <i className="ri-mail-line" />
-            <span>Email: <a href="mailto:support@planningcenter.com">support@planningcenter.com</a></span>
+            <span>Email: <a href="mailto:planningcenterofficial@gmail.com">planningcenterofficial@gmail.com</a></span>
           </div>
           <div className="legal-contact-row">
             <i className="ri-global-line" />

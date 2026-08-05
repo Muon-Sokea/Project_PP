@@ -2,7 +2,8 @@ const express = require("express");
 const { v4: uuidv4 } = require("uuid");
 const { PrismaClient } = require("@prisma/client");
 const { requireAuth } = require("../middleware/auth");
-const { notifyUser, broadcastCapacity } = require("../lib/notify");
+const { getIO } = require("../lib/socket");
+const { notifyUser, broadcastCapacity, broadcastEventUpdate } = require("../lib/notify");
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -39,7 +40,7 @@ router.get("/mine", requireAuth, async (req, res, next) => {
 // POST /api/registrations
 router.post("/", requireAuth, async (req, res, next) => {
   try {
-    const { eventId, ticketTypeId, quantity = 1 } = req.body;
+    const { eventId, ticketTypeId, quantity = 1, promoCode } = req.body;
     if (!eventId) return res.status(400).json({ error: "eventId is required." });
     const qty = Number(quantity) || 1;
 
@@ -75,6 +76,19 @@ router.post("/", requireAuth, async (req, res, next) => {
       resolvedTicketTypeId = tier.id;
     }
 
+    // Promo code — validated and applied server-side only. A code the client
+    // submits is never trusted for the discount amount, only checked against
+    // the event's actual configured code+percent.
+    let appliedPromoCode = null;
+    if (promoCode) {
+      const submitted = String(promoCode).trim().toUpperCase();
+      if (!event.promoCode || !event.promoDiscountPercent || submitted !== event.promoCode) {
+        return res.status(400).json({ error: "Invalid or expired promo code." });
+      }
+      unitPrice = Math.round(Number(unitPrice) * (1 - event.promoDiscountPercent / 100) * 100) / 100;
+      appliedPromoCode = event.promoCode;
+    }
+
     // Overall event capacity check — sum seats actually booked, not row count
     const takenAgg = await prisma.ticket.aggregate({
       where: { eventId: event.id, status: { not: "cancelled" } },
@@ -96,6 +110,7 @@ router.post("/", requireAuth, async (req, res, next) => {
         ticketType,
         quantity: qty,
         price: unitPrice,
+        promoCodeUsed: appliedPromoCode,
         userId:  req.user.id,
         eventId: event.id,
         ticketTypeId: resolvedTicketTypeId,
@@ -111,6 +126,28 @@ router.post("/", requireAuth, async (req, res, next) => {
       }).catch(err => console.warn("notifyUser failed:", err.message));
     }
     broadcastCapacity(event.id);
+    broadcastEventUpdate("capacity-changed", { id: event.id })
+      .catch(err => console.warn("broadcastEventUpdate failed:", err.message));
+
+    // Push a real-time new-registration event to the organizer so their
+    // dashboard updates the attendee list live without a manual refresh.
+    try {
+      const attendeeName = req.user.firstName && req.user.lastName
+        ? `${req.user.firstName} ${req.user.lastName}`
+        : req.user.email;
+      getIO().to(`user:${event.organizerId}`).emit("new-registration", {
+        name: attendeeName,
+        email: req.user.email,
+        eventId: event.id,
+        eventTitle: event.title,
+        ticketCode: ticket.ticketCode,
+        ticketType,
+        quantity: qty,
+        price: Number(unitPrice),
+        date: ticket.registeredAt.toISOString(),
+        status: ticket.status,
+      });
+    } catch { /* socket.io not initialized */ }
 
     res.status(201).json({
       id:          ticket.id,
@@ -121,6 +158,7 @@ router.post("/", requireAuth, async (req, res, next) => {
       quantity:    ticket.quantity,
       unit_price:  Number(unitPrice),
       total_price: Number(unitPrice) * qty,
+      promo_code_used: appliedPromoCode,
       status:      ticket.status,
       registered_at: ticket.registeredAt,
     });

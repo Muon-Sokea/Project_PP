@@ -103,6 +103,32 @@ async function sendEventReminderEmail(to, { eventTitle, eventDate, eventTime, ev
 }
 
 /**
+ * Notify a user that a new event has just been published (sent after an
+ * Admin/Supervisor approves an event — not on organizer creation, since a
+ * pending event isn't visible/bookable yet).
+ */
+async function sendNewEventEmail(to, { eventTitle, eventDate, eventLocation, eventId }) {
+  const link = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/events/${eventId}`;
+  const body = `
+    <div style="background:#f7f8fc;border-radius:10px;padding:20px;margin:0 0 20px">
+      <p style="margin:0 0 12px;font-size:15px;font-weight:600;color:#1a1a2e">${eventTitle}</p>
+      <table style="font-size:13px;color:#555;border-collapse:collapse">
+        <tr><td style="padding:3px 12px 3px 0;color:#8888a0">Date</td><td style="padding:3px 0;font-weight:500">${eventDate}</td></tr>
+        <tr><td style="padding:3px 12px 3px 0;color:#8888a0">Location</td><td style="padding:3px 0;font-weight:500">${eventLocation}</td></tr>
+      </table>
+    </div>
+    <a href="${link}" style="display:inline-block;background:#F5A623;color:#fff;text-decoration:none;
+              padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600">View event &amp; register</a>
+  `;
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM || `"Planning Center" <${process.env.SMTP_USER}>`,
+    to,
+    subject: `🎉 New event: ${eventTitle}`,
+    html: notificationShell('New Event Published', body),
+  });
+}
+
+/**
  * Send a refund status update notification.
  */
 async function sendRefundUpdateEmail(to, { eventName, ticketCode, status, reason }) {
@@ -199,4 +225,4 @@ async function sendEventApprovalEmail(to, { eventTitle, status }) {
   });
 }
 
-module.exports = { sendOtpEmail, sendEventReminderEmail, sendRefundUpdateEmail, sendPromotionalEmail, sendTestEmail, sendEventApprovalEmail, transporter };
+module.exports = { sendOtpEmail, sendEventReminderEmail, sendNewEventEmail, sendRefundUpdateEmail, sendPromotionalEmail, sendTestEmail, sendEventApprovalEmail, transporter };

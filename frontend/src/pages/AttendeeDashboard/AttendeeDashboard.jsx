@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiGetEvents } from '../../services/event.service.js';
 import { apiGetMyRegistrations } from '../../services/registration.service.js';
@@ -6,6 +6,7 @@ import { apiRequestRefund } from '../../services/refund.service.js';
 import { apiSubmitTestimonial, apiGetTestimonials } from '../../services/testimonial.service.js';
 import { apiGetNotificationPrefs, apiSaveNotificationPrefs } from '../../services/notification.service.js';
 import { apiGetBookmarks, apiUnbookmarkEvent } from '../../services/bookmark.service.js';
+import { apiUpdateUser, apiGetLoginHistory } from '../../services/user.service.js';
 import { fmtDate } from '../../utils/formatDate.js';
 import { useEscapeKey } from '../../hooks/useEscapeKey.js';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock.js';
@@ -135,7 +136,7 @@ export default function AttendeeDashboard() {
   const [reviewToast, setReviewToast] = useState({ msg: '', show: false });
 
   // Notifications
-  const [notif, setNotif] = useState({ email: true, sms: false, reminders: true, promotional: false, refundUpdates: true });
+  const [notif, setNotif] = useState({ email: true, reminders: true, promotional: false, refundUpdates: true });
 
   // Appearance
   const [darkMode, setDarkMode] = useState(() => document.documentElement.classList.contains('dark'));
@@ -154,10 +155,10 @@ export default function AttendeeDashboard() {
   const [secShowCurr, setSecShowCurr] = useState(false);
   const [secShowNew, setSecShowNew] = useState(false);
   const [secToast, setSecToast] = useState({ msg: '', show: false });
-  // Real-time connected devices (detected from browser fingerprint)
-  const [devices, setDevices] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('erms_devices') || '[]'); } catch { return []; }
-  });
+  // Real login history — powers both the Security Activity feed and the
+  // Connected Devices list (deduplicated below). No fake data, no
+  // localStorage — comes straight from GET /users/me/login-history.
+  const [loginHistory, setLoginHistory] = useState([]);
 
   // Profile toast
   const [profileToast, setProfileToast] = useState({ msg: '', show: false });
@@ -184,6 +185,10 @@ export default function AttendeeDashboard() {
       });
     }
   }, [user]);
+
+  useEffect(() => {
+    apiGetLoginHistory().then(setLoginHistory).catch(() => {});
+  }, []);
 
   useEffect(() => {
     async function loadRegistrations() {
@@ -258,89 +263,6 @@ export default function AttendeeDashboard() {
   useEffect(() => {
     if (activeTab === 'saved') loadBookmarks();
   }, [activeTab]);
-
-  // ── Real-time device detection ──────────────────────────────────────────
-  useEffect(() => {
-    function detectDevice() {
-      const ua = navigator.userAgent;
-      const platform = navigator.platform || '';
-      const screenW = screen.width;
-      const screenH = screen.height;
-      const lang = navigator.language;
-
-      // Generate a fingerprint from browser signals
-      const fingerprint = [
-        ua,
-        platform,
-        screenW,
-        screenH,
-        lang,
-      ].join('||');
-
-      // Simple hash
-      let hash = 0;
-      for (let i = 0; i < fingerprint.length; i++) {
-        const chr = fingerprint.charCodeAt(i);
-        hash = ((hash << 5) - hash) + chr;
-        hash |= 0;
-      }
-
-      // Detect device type
-      const isMobile = /Mobile|Android|iPhone|iPad|iPod/i.test(ua);
-      const isTablet = /iPad|Android(?!.*Mobile)/i.test(ua);
-      const deviceType = isMobile ? (isTablet ? 'tablet' : 'phone') : 'laptop';
-
-      // Detect OS
-      let os = 'Unknown OS';
-      if (/Windows NT 10/.test(ua)) os = 'Windows 10';
-      else if (/Windows NT 11/.test(ua)) os = 'Windows 11';
-      else if (/Mac OS X/.test(ua)) {
-        const m = ua.match(/Mac OS X ([\d_.]+)/);
-        os = m ? 'macOS ' + m[1].replace(/_/g, '.') : 'macOS';
-      } else if (/Android/.test(ua)) {
-        const m = ua.match(/Android ([\d.]+)/);
-        os = m ? 'Android ' + m[1] : 'Android';
-      } else if (/iPhone|iPad|iPod/.test(ua)) {
-        const m = ua.match(/OS ([\d_]+)/);
-        os = m ? 'iOS ' + m[1].replace(/_/g, '.') : 'iOS';
-      } else if (/Linux/.test(ua)) os = 'Linux';
-
-      // Detect browser
-      let browser = 'Unknown';
-      if (/Edg\//.test(ua)) browser = 'Edge';
-      else if (/Chrome\//.test(ua)) browser = 'Chrome';
-      else if (/Firefox\//.test(ua)) browser = 'Firefox';
-      else if (/Safari\//.test(ua)) browser = 'Safari';
-
-      const deviceName = [browser, os].join(' · ');
-      const now = new Date();
-      const meta = os + ' · ' + screenW + 'x' + screenH;
-
-      return { id: hash, name: deviceName, meta, type: deviceType, os, browser, fingerprint: hash, lastSeen: now.toISOString() };
-    }
-
-    const current = detectDevice();
-    try {
-      const stored = JSON.parse(localStorage.getItem('erms_devices') || '[]');
-      const existing = stored.find(d => d.id === current.id);
-      if (existing) {
-        // Update last seen
-        const updated = stored.map(d =>
-          d.id === current.id ? { ...d, lastSeen: new Date().toISOString(), meta: current.meta } : d
-        );
-        localStorage.setItem('erms_devices', JSON.stringify(updated));
-        setDevices(updated);
-      } else {
-        // Add new device
-        const updated = [...stored, current];
-        localStorage.setItem('erms_devices', JSON.stringify(updated));
-        setDevices(updated);
-      }
-    } catch {
-      // Fallback: just show current device
-      setDevices([current]);
-    }
-  }, []);
 
   // Escape key
   useEscapeKey(() => {
@@ -474,16 +396,34 @@ export default function AttendeeDashboard() {
   }
 
   // ── Save profile ──────────────────────────────────────────────────────────
-  function saveProfile() {
-    if (!profile.firstName.trim() || !profile.lastName.trim() || !profile.email.trim()) {
-      alert('Please fill in all required fields.');
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  async function saveProfile() {
+    if (!profile.firstName.trim() || !profile.lastName.trim()) {
+      showProfileToast('First and last name are required.');
       return;
     }
-    const updated = { ...user, ...profile };
-    localStorage.setItem('erms_user', JSON.stringify(updated));
-    setUser(updated);
-    alert('Profile updated successfully!');
-    setProfileOpen(false);
+    setSavingProfile(true);
+    try {
+      // Email is intentionally excluded — the backend doesn't support
+      // changing it here (it's tied to login/OAuth identity), so the field
+      // is read-only in the form above.
+      const updated = await apiUpdateUser(user.id, {
+        firstName: profile.firstName.trim(),
+        lastName:  profile.lastName.trim(),
+        phone:     profile.phone.trim(),
+        address:   profile.address.trim(),
+      });
+      const merged = { ...user, ...updated };
+      localStorage.setItem('erms_user', JSON.stringify(merged));
+      setUser(merged);
+      showProfileToast('Profile updated successfully!');
+      setProfileOpen(false);
+    } catch (err) {
+      showProfileToast(err.message || 'Failed to update profile.');
+    } finally {
+      setSavingProfile(false);
+    }
   }
 
   // ── Dark mode ─────────────────────────────────────────────────────────────
@@ -542,15 +482,18 @@ export default function AttendeeDashboard() {
     showSecToast('Password updated successfully ✓');
   }
 
-  function removeDevice(id) {
-    const dev = devices.find(d => d.id === id);
-    const updated = devices.filter(d => d.id !== id);
-    setDevices(updated);
-    try { localStorage.setItem('erms_devices', JSON.stringify(updated)); } catch {}
-    showSecToast(`${dev?.name || 'Device'} removed`);
-  }
-
   // ── Derived ───────────────────────────────────────────────────────────────
+  // Connected Devices = unique devices from login history, most recent first.
+  // Read-only — no "remove" action, since JWTs here are stateless bearer
+  // tokens with no per-device session to actually revoke (see loginHistory.js).
+  const connectedDevices = useMemo(() => {
+    const seen = new Map();
+    for (const ev of loginHistory) {
+      if (!seen.has(ev.device)) seen.set(ev.device, ev);
+    }
+    return [...seen.values()];
+  }, [loginHistory]);
+
   const events    = activeTab === 'past' ? registrations.past : (activeTab === 'saved' ? savedEvents : registrations.upcoming);
   const allEvents = [...registrations.upcoming, ...registrations.past];
   const totalSpent = allEvents.reduce((s, e) => s + (e.price || 0), 0);
@@ -852,22 +795,24 @@ export default function AttendeeDashboard() {
               {[
                 { id: 'firstName', label: 'First Name', type: 'text' },
                 { id: 'lastName',  label: 'Last Name',  type: 'text' },
-                { id: 'email',     label: 'Email Address', type: 'email' },
+                { id: 'email',     label: 'Email Address', type: 'email', readOnly: true },
                 { id: 'phone',     label: 'Phone Number',  type: 'tel' },
                 { id: 'address',   label: 'Address',       type: 'text' },
               ].map(f => (
                 <div className="form-group" key={f.id}>
-                  <label>{f.label}</label>
+                  <label>{f.label}{f.readOnly && ' (cannot be changed here)'}</label>
                   <input
                     type={f.type}
                     value={profile[f.id]}
                     placeholder={f.label}
+                    readOnly={f.readOnly}
+                    disabled={f.readOnly}
                     onChange={e => setProfile(p => ({ ...p, [f.id]: e.target.value }))}
                   />
                 </div>
               ))}
-              <button className="btn btn-primary btn-full" onClick={saveProfile}>
-                <i className="ri-save-line" /> Save Changes
+              <button className="btn btn-primary btn-full" onClick={saveProfile} disabled={savingProfile}>
+                <i className="ri-save-line" /> {savingProfile ? 'Saving…' : 'Save Changes'}
               </button>
             </div>
 
@@ -909,17 +854,17 @@ export default function AttendeeDashboard() {
               <div className="sec-activity">
                 <h4>Security Activity</h4>
                 <div className="sec-tl">
-                  {[
-                    { dot: 'blue', date: 'May 12, 2024', event: 'Login from Chrome on MacBook Pro', meta: 'IP: 192.168.1.45 · San Francisco, CA' },
-                    { dot: '',     date: 'Apr 30, 2024', event: 'Password changed via web', meta: 'Initiated from Chrome on MacBook Pro' },
-                    { dot: 'green',date: 'Apr 22, 2024', event: 'New device linked: iPhone 14', meta: 'First login from this device' },
-                  ].map((item, i) => (
-                    <div className="sec-tl-item" key={i}>
-                      <div className={`sec-tl-dot${item.dot ? ` ${item.dot}` : ''}`} />
-                      <div className="sec-tl-date">{item.date}</div>
+                  {loginHistory.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: 28, color: 'var(--text-light)', fontSize: 13 }}>No login activity recorded yet</div>
+                  ) : loginHistory.map((ev, i) => (
+                    <div className="sec-tl-item" key={ev.id}>
+                      <div className={`sec-tl-dot${i === 0 ? ' blue' : ''}`} />
+                      <div className="sec-tl-date">{fmtDate(ev.createdAt)}</div>
                       <div>
-                        <div className="sec-tl-event">{item.event}</div>
-                        <div className="sec-tl-meta">{item.meta}</div>
+                        <div className="sec-tl-event">
+                          Login via {ev.method === 'password' ? 'email/password' : ev.method === 'google' ? 'Google' : 'Telegram'} — {ev.device}
+                        </div>
+                        <div className="sec-tl-meta">IP: {ev.ip || 'unknown'}</div>
                       </div>
                     </div>
                   ))}
@@ -927,44 +872,27 @@ export default function AttendeeDashboard() {
               </div>
 
               <div className="sec-devices">
-                <h4>Connected Devices ({(devices || []).length})</h4>
+                <h4>Connected Devices ({connectedDevices.length})</h4>
                 <div className="sec-dev-list">
-                  {(!devices || devices.length === 0) ? (
+                  {connectedDevices.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: 28, color: 'var(--text-light)', fontSize: 13 }}>No devices detected yet</div>
                   ) : (
-                    [...devices]
-                      .sort((a, b) => new Date(b.lastSeen) - new Date(a.lastSeen))
-                      .map((d, idx) => {
-                        const isCurrent = idx === 0;
-                        const lastSeen = new Date(d.lastSeen);
-                        const now = new Date();
-                        const diffMs = now - lastSeen;
-                        const diffMin = Math.floor(diffMs / 60000);
-                        const diffHr  = Math.floor(diffMs / 3600000);
-                        const diffDay = Math.floor(diffMs / 86400000);
-                        let timeAgo;
-                        if (diffMin < 1) timeAgo = 'just now';
-                        else if (diffMin < 60) timeAgo = diffMin + 'm ago';
-                        else if (diffHr < 24) timeAgo = diffHr + 'h ago';
-                        else if (diffDay < 7) timeAgo = diffDay + 'd ago';
-                        else timeAgo = lastSeen.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                        return (
-                          <div className={`sec-dev-item${isCurrent ? ' current' : ''}`} key={d.id}>
-                            <div className="sec-dev-icon"><DeviceIcon type={d.type || 'laptop'} /></div>
-                            <div className="sec-dev-info">
-                              <div className="sec-dev-name">
-                                {d.name}
-                                {isCurrent && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Current</span>}
-                              </div>
-                              <div className="sec-dev-meta">{d.meta} · {timeAgo}</div>
+                    connectedDevices.map((d, idx) => {
+                      const isCurrent = idx === 0;
+                      const isMobile = /Android|iOS/.test(d.device);
+                      return (
+                        <div className={`sec-dev-item${isCurrent ? ' current' : ''}`} key={d.id}>
+                          <div className="sec-dev-icon"><DeviceIcon type={isMobile ? 'phone' : 'laptop'} /></div>
+                          <div className="sec-dev-info">
+                            <div className="sec-dev-name">
+                              {d.device}
+                              {isCurrent && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Current</span>}
                             </div>
-                            <span className={`sec-dev-badge ${isCurrent ? 'current' : 'old'}`}>
-                              {isCurrent ? 'Active' : lastSeen.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                            </span>
-                            <button className="sec-dev-remove" onClick={() => removeDevice(d.id)}>Remove</button>
+                            <div className="sec-dev-meta">Last seen {fmtDate(d.createdAt)} · IP {d.ip || 'unknown'}</div>
                           </div>
-                        );
-                      })
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -973,11 +901,10 @@ export default function AttendeeDashboard() {
             {/* Notifications Tab */}
             <div className={`modal-tab-content${profileTab === 'notification' ? ' active' : ''}`}>
               {[
-                { key: 'email',         label: 'Email Notifications',  sub: 'Receive event updates via email' },
-                { key: 'sms',           label: 'SMS Notifications',    sub: 'Receive alerts via SMS' },
-                { key: 'reminders',     label: 'Event Reminders',      sub: 'Get reminded before events start' },
-                { key: 'promotional',   label: 'Promotional Emails',   sub: 'Receive news and offers' },
-                { key: 'refundUpdates', label: 'Refund Updates',       sub: 'Get notified on refund status' },
+                { key: 'email',         label: 'Email Notifications',  sub: 'Get emailed when new events are published' },
+                { key: 'reminders',     label: 'Event Reminders',      sub: 'Get emailed 1 day before your booked events' },
+                { key: 'promotional',   label: 'Promotional Emails',   sub: 'Receive promo offers from organizers for events you booked' },
+                { key: 'refundUpdates', label: 'Refund Updates',       sub: 'Get emailed when your refund status changes' },
               ].map(item => (
                 <div className="setting-row" key={item.key}>
                   <div>

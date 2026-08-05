@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiDeleteEvent, apiCreateEvent } from '../../services/event.service.js';
+import { apiDeleteEvent, apiCreateEvent, apiPromoteEvent } from '../../services/event.service.js';
 import { apiGetOrganizerStats } from '../../services/organizer.service.js';
 import { apiGetEventAttendees } from '../../services/registration.service.js';
+import { useNotifications } from '../../context/NotificationContext.jsx';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock.js';
 import { useToast } from '../../hooks/useToast.js';
 import { initials } from '../../utils/initials.js';
@@ -30,6 +31,7 @@ function StatusBadge({ status }) {
 
 export default function OrganizerDashboard() {
   const navigate = useNavigate();
+  const { socket } = useNotifications();
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [events, setEvents] = useState([]);
@@ -42,6 +44,10 @@ export default function OrganizerDashboard() {
   const [view, setView] = useState('home');
   const [currentEventId, setCurrentEventId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [promoTarget, setPromoTarget] = useState(null); // event id, or null when closed
+  const [promoSubject, setPromoSubject] = useState('');
+  const [promoMessage, setPromoMessage] = useState('');
+  const [promoSending, setPromoSending] = useState(false);
   const [toast, showToast] = useToast();
   const [attSearch, setAttSearch] = useState('');
   const [attFilter, setAttFilter] = useState('all');
@@ -155,6 +161,7 @@ export default function OrganizerDashboard() {
   }, [view, currentEventId]);
 
   useBodyScrollLock(!!deleteTarget);
+  useBodyScrollLock(!!promoTarget);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -169,9 +176,49 @@ export default function OrganizerDashboard() {
 
   const currentEvent = useMemo(() => events.find(e => e.id === currentEventId), [events, currentEventId]);
 
-  // Log for debugging
-  console.log('[OrganizerDashboard] events:', events.length, 'loading:', loading, 'stats:', !!stats);
-  if (events.length > 0) console.log('[OrganizerDashboard] first event:', events[0].title, events[0].status);
+  // ── Real-time new registration listener ───────────────────────────────
+  useEffect(() => {
+    if (!socket) return;
+    function onNewRegistration(data) {
+      // Prepend new attendee to the attendees list
+      const newAttendee = {
+        id: data.ticketCode || Date.now(),
+        name: data.name,
+        email: data.email,
+        ticket: data.ticketType || 'Standard',
+        ticketCode: data.ticketCode || '',
+        quantity: data.quantity || 1,
+        price: data.price || 0,
+        date: data.date,
+        status: data.status === 'confirmed' ? 'checked-in' : 'pending',
+      };
+      setAttendees(prev => [newAttendee, ...prev]);
+
+      // Update that event's registered count
+      setEvents(prev => prev.map(ev =>
+        ev.id === data.eventId
+          ? { ...ev, registered: (Number(ev.registered) || 0) + (data.quantity || 1) }
+          : ev
+      ));
+
+      // Update aggregated stats
+      setStats(prev => {
+        if (!prev) return prev;
+        const qty = data.quantity || 1;
+        const rev = (data.price || 0) * qty;
+        return {
+          ...prev,
+          totalRegistrations: (prev.totalRegistrations || 0) + qty,
+          totalRevenue: (prev.totalRevenue || 0) + rev,
+          averageAttendee: Math.round(((prev.totalRegistrations || 0) + qty) / Math.max(prev.totalEvents, 1)),
+        };
+      });
+
+      showToast(`🎉 New registration! ${data.name} joined "${data.eventTitle}"`);
+    }
+    socket.on('new-registration', onNewRegistration);
+    return () => { socket.off('new-registration', onNewRegistration); };
+  }, [socket]);
 
   // ── Home stats ──────────────────────────────────────────────────────────
   const statCards = useMemo(() => {
@@ -242,6 +289,27 @@ export default function OrganizerDashboard() {
       // Revert on failure
       setEvents(es => [...es, deletedEvent]);
       showToast(`Failed to delete event: ${err.message}`);
+    }
+  }
+
+  // ── Promotional email ────────────────────────────────────────────────────
+  function openPromo(id) {
+    setPromoTarget(id);
+    setPromoSubject('');
+    setPromoMessage('');
+  }
+
+  async function sendPromo() {
+    if (!promoTarget || !promoSubject.trim() || !promoMessage.trim()) return;
+    setPromoSending(true);
+    try {
+      const res = await apiPromoteEvent(promoTarget, { subject: promoSubject, message: promoMessage });
+      showToast(res.message || 'Promotional email sent.');
+      setPromoTarget(null);
+    } catch (err) {
+      showToast(`Failed to send promo: ${err.message}`);
+    } finally {
+      setPromoSending(false);
     }
   }
 
@@ -396,6 +464,11 @@ export default function OrganizerDashboard() {
                             <button className="btn btn-outline btn-sm" onClick={() => { setCurrentEventId(ev.id); setAttSearch(''); setAttFilter('all'); setView('attendees'); }}>
                               <i className="ri-group-line" /> View Attendees
                             </button>
+                            {ev.approvalStatus === 'APPROVED' && (
+                              <button className="btn btn-outline btn-sm" onClick={() => openPromo(ev.id)}>
+                                <i className="ri-megaphone-line" /> Send Promo
+                              </button>
+                            )}
                             <button className="btn btn-delete btn-sm" onClick={() => setDeleteTarget(ev.id)}>
                               <i className="ri-delete-bin-line" /> Delete
                             </button>
@@ -613,6 +686,30 @@ export default function OrganizerDashboard() {
           <div className="modal-actions">
             <button className="btn btn-outline" onClick={() => setDeleteTarget(null)}>Cancel</button>
             <button className="btn btn-danger" onClick={doDelete}>Yes, Delete</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Send Promo Modal */}
+      <div className={`modal-overlay${promoTarget ? ' open' : ''}`} onClick={e => { if (e.target === e.currentTarget) setPromoTarget(null); }}>
+        <div className="modal-sm">
+          <h3><i className="ri-megaphone-line" /> Send Promotional Email</h3>
+          <p style={{ fontSize: 13, color: 'var(--text-light)', marginTop: -8, marginBottom: 16 }}>
+            Sent to ticket holders of <strong>{events.find(e => e.id === promoTarget)?.title}</strong> who have Promotional Emails enabled.
+          </p>
+          <div className="form-group">
+            <label>Subject</label>
+            <input type="text" value={promoSubject} onChange={e => setPromoSubject(e.target.value)} placeholder="e.g. 20% off next week!" />
+          </div>
+          <div className="form-group">
+            <label>Message</label>
+            <textarea rows={4} value={promoMessage} onChange={e => setPromoMessage(e.target.value)} placeholder="Write your promotional message..." />
+          </div>
+          <div className="modal-actions">
+            <button className="btn btn-outline" onClick={() => setPromoTarget(null)}>Cancel</button>
+            <button className="btn btn-primary" onClick={sendPromo} disabled={promoSending || !promoSubject.trim() || !promoMessage.trim()}>
+              {promoSending ? 'Sending…' : 'Send Email'}
+            </button>
           </div>
         </div>
       </div>

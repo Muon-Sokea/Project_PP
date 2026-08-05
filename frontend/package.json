@@ -17,13 +17,15 @@
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.0",
     "serve": "^14.2.6",
-    "socket.io-client": "^4.8.3"
+    "socket.io-client": "^4.8.3",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-latest/xlsx-latest.tgz"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
     "vite": "^7.3.6"
   },
   "allowScripts": {
-    "core-js@3.49.0": true
+    "core-js@3.49.0": true,
+    "esbuild@0.28.1": true
   }
 }

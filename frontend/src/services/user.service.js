@@ -4,6 +4,10 @@ export async function apiGetAllUsers() {
   return http('GET', '/users');
 }
 
+export async function apiGetLoginHistory() {
+  return http('GET', '/users/me/login-history');
+}
+
 export async function apiUpdateUser(userId, data) {
   return http('PUT', `/users/${userId}`, data);
 }

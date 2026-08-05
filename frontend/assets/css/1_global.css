@@ -172,6 +172,7 @@ h4 { font-size: 15px; font-weight: 500; }
 .badge-confirmed  { background: linear-gradient(135deg, #d4edda, #b8e6c8); color: #155724; }
 .badge-pending    { background: linear-gradient(135deg, #fff3cd, #ffe69c); color: #856404; }
 .badge-cancelled  { background: linear-gradient(135deg, #f8d7da, #f1b0b7); color: #721c24; }
+.badge-promo      { background: var(--gradient-accent, linear-gradient(135deg, #F5A623 0%, #e85d04 100%)); color: #fff; }
 
 /* ── Alerts ── */
 .alert {

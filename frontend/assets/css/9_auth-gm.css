@@ -141,8 +141,11 @@ html.dark .doodle-icon { opacity: 0.14; }
 .pw-toggle i { transition:opacity .15s ease; }
 .pw-toggle:hover { color:var(--amber); }
 
-.field-error { font-size:12px; color:var(--err); margin-top:5px; display:none; }
-.field.invalid .field-error { display:block; }
+/* min-height reserved so an error appearing/disappearing never changes the
+   card's total height — display:none previously collapsed this to 0px,
+   causing the whole card to visibly grow/shrink as each field validated. */
+.field-error { font-size:12px; line-height:1.4; color:var(--err); margin-top:5px; min-height:17px; visibility:hidden; }
+.field.invalid .field-error { visibility:visible; }
 
 /* ── Password strength (register) ── */
 .pw-strength { display:none; align-items:center; gap:10px; margin:-8px 0 16px; }
@@ -228,3 +231,36 @@ html.dark .doodle-icon { opacity: 0.14; }
   position:absolute; width:1px; height:1px; padding:0; margin:-1px;
   overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
 }
+
+/* ── Shared multi-step auth card pieces ──────────────────────────────────
+   Used by ForgotPasswordPage and RegisterPage's email-verify step so both
+   flows share one visual language instead of drifting apart. */
+
+.auth-back {
+  display:inline-flex; align-items:center; gap:6px;
+  background:none; border:none; font-family:inherit; cursor:pointer;
+  font-size:13px; font-weight:600; color:var(--muted); text-decoration:none;
+  padding:0; margin-bottom:14px; transition:color .15s;
+}
+.auth-back:hover { color:var(--amber); }
+
+/* OTP digit boxes */
+.otp-row { display:flex; gap:10px; justify-content:center; margin:22px 0 6px; }
+.otp-input {
+  width:48px; height:56px; text-align:center; font-size:22px; font-weight:700;
+  color:var(--input-text); background:var(--input-bg);
+  border:1px solid var(--border); border-radius:12px; font-family:inherit;
+  outline:none; transition:border-color .2s, box-shadow .2s, transform .15s;
+}
+.otp-input:focus { border-color:var(--amber); box-shadow:0 0 0 2px var(--ring); transform:translateY(-2px); }
+.otp-input.filled { border-color:var(--ok); }
+.otp-error { font-size:12px; color:var(--err); text-align:center; min-height:16px; margin-top:8px; }
+
+.auth-resend { text-align:center; font-size:13px; color:var(--muted); margin-top:14px; }
+.auth-resend-link { color:var(--amber); font-weight:600; cursor:pointer; background:none; border:none; font-family:inherit; padding:0; }
+.auth-resend-link:hover { text-decoration:underline; }
+.auth-resend-link:disabled { opacity:.4; cursor:default; text-decoration:none; }
+
+.auth-alt-action { text-align:center; font-size:13px; color:var(--muted); margin-top:10px; }
+.auth-alt-action button { color:var(--amber); font-weight:600; cursor:pointer; background:none; border:none; font-family:inherit; padding:0; font-size:inherit; }
+.auth-alt-action button:hover { text-decoration:underline; }

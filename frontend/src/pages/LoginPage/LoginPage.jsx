@@ -9,6 +9,11 @@ import './LoginPage.css';
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TELEGRAM_BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || '';
 
+const ROLE_ROUTES = {
+  Supervisor: '/superadmin', Admin: '/admin',
+  Organizer:  '/organizer',  Attendee: '/dashboard',
+};
+
 function shake(fieldEl) {
   if (!fieldEl) return;
   fieldEl.classList.remove('shaking');
@@ -30,7 +35,8 @@ export default function LoginPage() {
       const data = await apiGoogleLogin(credentialResponse.credential);
       syncSession();
       setSuccess(true);
-      setTimeout(() => navigate('/'), 650);
+      const role = localStorage.getItem('erms_role');
+      setTimeout(() => navigate(ROLE_ROUTES[role] || '/'), 650);
     } catch (err) {
       const msg = err.message || String(err);
       setErrors({ email: `Google sign-in failed: ${msg}` });
@@ -48,7 +54,8 @@ export default function LoginPage() {
       await apiTelegramLogin(telegramUser);
       syncSession();
       setSuccess(true);
-      setTimeout(() => navigate('/'), 650);
+      const role = localStorage.getItem('erms_role');
+      setTimeout(() => navigate(ROLE_ROUTES[role] || '/'), 650);
     } catch (err) {
       const msg = err.message || String(err);
       setErrors({ email: `Telegram sign-in failed: ${msg}` });
@@ -88,10 +95,10 @@ export default function LoginPage() {
   const emailFieldRef = useRef(null);
   const pwFieldRef    = useRef(null);
 
-  // Redirect already-logged-in users to home page
+  // Redirect already-logged-in users to their role-specific dashboard
   useEffect(() => {
     const role = localStorage.getItem('erms_role');
-    if (role) navigate('/', { replace: true });
+    if (role) navigate(ROLE_ROUTES[role] || '/', { replace: true });
   }, [navigate]);
 
   // ── Per-field validation ──────────────────────────────────────────────────
@@ -141,7 +148,8 @@ export default function LoginPage() {
       const data = await apiLogin(email, password);
       syncSession();
       setSuccess(true);
-      setTimeout(() => navigate('/'), 650);
+      const role = localStorage.getItem('erms_role');
+      setTimeout(() => navigate(ROLE_ROUTES[role] || '/'), 650);
     } catch (err) {
       const msg = err.message || String(err);
       if (msg.toLowerCase().includes('password')) {

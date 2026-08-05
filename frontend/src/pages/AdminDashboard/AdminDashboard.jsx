@@ -8,6 +8,7 @@ import { apiGetAdminStats } from '../../services/admin.service.js';
 import { useEscapeKey } from '../../hooks/useEscapeKey.js';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock.js';
 import { fmtDate } from '../../utils/formatDate.js';
+import { useNotifications } from '../../context/NotificationContext.jsx';
 import DashboardNavbar from '../../components/layout/DashboardNavbar/DashboardNavbar.jsx';
 import '../../../assets/css/1_global.css';
 import '../../../assets/css/6_dashboard.css';
@@ -62,6 +63,7 @@ function ChartCanvas({ id, labels, data }) {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const { socket } = useNotifications();
 
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -136,6 +138,36 @@ export default function AdminDashboard() {
       .then(data => setOverviewStats(data))
       .catch(() => setOverviewStats(null));
   }, []);
+
+  // ── Real-time socket listeners ─────────────────────────────────────────
+  // Keeps the Admin Dashboard up-to-date when events are created/approved/
+  // rejected and when new refund requests come in — no manual refresh needed.
+  useEffect(() => {
+    if (!socket) return;
+
+    function onEventUpdate() {
+      refreshEvents();
+      apiGetAdminStats()
+        .then(data => setOverviewStats(data))
+        .catch(() => {});
+    }
+
+    function onNotification(notification) {
+      if (notification.type === 'refund_requested' || notification.type === 'refund_resolved') {
+        apiGetRefunds()
+          .then(data => setRefunds(Array.isArray(data) ? data : []))
+          .catch(() => {});
+      }
+    }
+
+    socket.on('event-update', onEventUpdate);
+    socket.on('notification', onNotification);
+
+    return () => {
+      socket.off('event-update', onEventUpdate);
+      socket.off('notification', onNotification);
+    };
+  }, [socket]);
 
   function displayStatus(e) {
     if (e.approvalStatus === 'PENDING') return 'Pending';

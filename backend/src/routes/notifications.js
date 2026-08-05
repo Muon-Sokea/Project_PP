@@ -56,7 +56,7 @@ router.get("/preferences", requireAuth, async (req, res, next) => {
       select: { notificationPrefs: true },
     });
     // Default preferences if none saved
-    const defaults = { email: true, sms: false, reminders: true, promotional: false, refundUpdates: true };
+    const defaults = { email: true, reminders: true, promotional: false, refundUpdates: true };
     let prefs = defaults;
     if (user?.notificationPrefs && typeof user.notificationPrefs === "object") {
       prefs = { ...defaults, ...user.notificationPrefs };
@@ -70,7 +70,7 @@ router.put("/preferences", requireAuth, async (req, res, next) => {
   try {
     const prefs = req.body;
     // Validate shape
-    const allowed = ["email", "sms", "reminders", "promotional", "refundUpdates"];
+    const allowed = ["email", "reminders", "promotional", "refundUpdates"];
     const clean = {};
     for (const key of allowed) {
       if (typeof prefs[key] === "boolean") clean[key] = prefs[key];

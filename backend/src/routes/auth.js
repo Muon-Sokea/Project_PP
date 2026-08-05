@@ -8,6 +8,8 @@ const redis    = require("../lib/redis");
 const { sendOtpEmail } = require("../lib/mailer");
 const { requireAuth } = require("../middleware/auth");
 const { verifyTelegramAuth } = require("../lib/telegramAuth");
+const { getIO } = require("../lib/socket");
+const { recordLogin } = require("../lib/loginHistory");
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -39,9 +41,11 @@ router.post("/login", async (req, res, next) => {
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).json({ error: "Invalid email or password." });
 
+    if (user.deletedAt) return res.status(403).json({ error: "This account no longer exists." });
     if (user.status === "suspended") return res.status(403).json({ error: "Account suspended." });
 
     const token = signToken(user);
+    recordLogin(req, user.id, "password");
     res.json({ token, user: safeUser(user) });
   } catch (err) { next(err); }
 });
@@ -75,6 +79,9 @@ router.post("/register", async (req, res, next) => {
     }
 
     res.status(201).json({ user_id: user.id, email: user.email });
+
+    // Notify dashboard that a new user registered
+    try { getIO().emit("user-update", { action: "registered", userId: user.id }); } catch {}
   } catch (err) { next(err); }
 });
 
@@ -97,6 +104,7 @@ router.post("/verify-email", async (req, res, next) => {
     });
 
     const token = signToken(user);
+    recordLogin(req, user.id, "password");
     res.json({ token, user: safeUser(user) });
   } catch (err) { next(err); }
 });
@@ -201,6 +209,7 @@ router.post("/google", async (req, res, next) => {
     let user = await prisma.user.findFirst({
       where: { OR: [{ googleId }, { email: email.toLowerCase() }] },
     });
+    const wasExisting = !!user;
 
     if (user) {
       // Existing user — link googleId if not already linked
@@ -232,10 +241,17 @@ router.post("/google", async (req, res, next) => {
       });
     }
 
+    if (user.deletedAt) return res.status(403).json({ error: "This account no longer exists." });
     if (user.status === "suspended") return res.status(403).json({ error: "Account suspended." });
 
     const token = signToken(user);
+    recordLogin(req, user.id, "google");
     res.json({ token, user: safeUser(user) });
+
+    // Notify dashboard of new user registration (only for newly created users)
+    if (!wasExisting) {
+      try { getIO().emit("user-update", { action: "registered", userId: user.id }); } catch {}
+    }
   } catch (err) {
     console.error("Google auth error:", err.message);
     res.status(401).json({ error: "Invalid Google token." });
@@ -254,6 +270,7 @@ router.post("/telegram", async (req, res, next) => {
 
     const telegramId = String(data.id);
     let user = await prisma.user.findUnique({ where: { telegramId } });
+    let isExistingUser = !!user;
 
     if (user) {
       if (data.photo_url && data.photo_url !== user.avatar) {
@@ -273,10 +290,17 @@ router.post("/telegram", async (req, res, next) => {
       });
     }
 
+    if (user.deletedAt) return res.status(403).json({ error: "This account no longer exists." });
     if (user.status === "suspended") return res.status(403).json({ error: "Account suspended." });
 
     const token = signToken(user);
+    recordLogin(req, user.id, "telegram");
     res.json({ token, user: safeUser(user) });
+
+    // Notify dashboard of new user registration
+    if (!isExistingUser) {
+      try { getIO().emit("user-update", { action: "registered", userId: user.id }); } catch {}
+    }
   } catch (err) {
     console.error("Telegram auth error:", err.message);
     res.status(401).json({ error: "Invalid Telegram authentication." });

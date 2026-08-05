@@ -48,6 +48,11 @@ export default function EventRegistrationPage() {
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCVV,    setCardCVV]    = useState('');
 
+  // Promo code
+  const [promoInput,   setPromoInput]   = useState('');
+  const [promoApplied, setPromoApplied] = useState(false);
+  const [promoError,   setPromoError]   = useState('');
+
   // UI
   const [submitting, setSubmitting] = useState(false);
   const [error,      setError]      = useState('');
@@ -79,7 +84,21 @@ export default function EventRegistrationPage() {
   const selectedTier = hasTiers ? tiers.find(t => t.id === selectedTierId) : null;
   const unitPrice = hasTiers ? Number(selectedTier?.price || 0) : Number(event?.price || 0);
   const seatsLeftForTier = selectedTier ? Math.max(0, selectedTier.quantity - (selectedTier.sold || 0)) : null;
-  const total = unitPrice * qty;
+  const subtotal = unitPrice * qty;
+  const discountPct = promoApplied ? Number(event?.promoDiscountPercent || 0) : 0;
+  const total = subtotal * (1 - discountPct / 100);
+
+  function applyPromoCode() {
+    setPromoError('');
+    const code = promoInput.trim().toUpperCase();
+    if (!code) return;
+    if (!event?.promoCode || !event?.promoDiscountPercent || code !== event.promoCode) {
+      setPromoApplied(false);
+      setPromoError('Invalid or expired promo code.');
+      return;
+    }
+    setPromoApplied(true);
+  }
 
   // ── Submit ────────────────────────────────────────────────────────────────
   async function handleSubmit(e) {
@@ -97,6 +116,7 @@ export default function EventRegistrationPage() {
       const ticket = await apiRegisterForEvent(event.id, {
         ticketTypeId: hasTiers ? selectedTierId : undefined,
         quantity: qty,
+        promoCode: promoApplied ? event.promoCode : undefined,
       });
 
       localStorage.setItem('erms_from_payment', 'true');
@@ -278,8 +298,37 @@ export default function EventRegistrationPage() {
             </div>
             <div className="order-row">
               <span>{ticketLabel}</span>
-              <span style={{ color: 'var(--primary)' }}>${total.toFixed(2)}</span>
+              <span style={{ color: 'var(--primary)' }}>${subtotal.toFixed(2)}</span>
             </div>
+
+            {event.promoCode && event.promoDiscountPercent > 0 && (
+              <div style={{ margin: '10px 0' }}>
+                {promoApplied ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13, color: 'var(--ok, #16a34a)' }}>
+                    <span><i className="ri-checkbox-circle-fill" /> Code "{event.promoCode}" applied — {event.promoDiscountPercent}% off</span>
+                    <button type="button" onClick={() => { setPromoApplied(false); setPromoInput(''); }} style={{ background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer', fontSize: 12, textDecoration: 'underline' }}>Remove</button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      type="text" placeholder="Promo code" value={promoInput}
+                      onChange={e => { setPromoInput(e.target.value.toUpperCase()); setPromoError(''); }}
+                      style={{ flex: 1, textTransform: 'uppercase' }}
+                    />
+                    <button type="button" className="btn btn-outline btn-sm" onClick={applyPromoCode}>Apply</button>
+                  </div>
+                )}
+                {promoError && <div style={{ color: 'var(--danger)', fontSize: 12, marginTop: 4 }}>{promoError}</div>}
+              </div>
+            )}
+
+            {promoApplied && (
+              <div className="order-row">
+                <span>Discount ({discountPct}%)</span>
+                <span style={{ color: 'var(--ok, #16a34a)' }}>-${(subtotal - total).toFixed(2)}</span>
+              </div>
+            )}
+
             <div className="order-total">
               <span>Total:</span>
               <span>${total.toFixed(2)}</span>

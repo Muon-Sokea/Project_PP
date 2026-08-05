@@ -1,4 +1,3 @@
-import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
@@ -11,10 +10,12 @@ import './index.css';
   document.documentElement.classList.toggle('dark', dark);
 })();
 
+// Note: <StrictMode> was removed to prevent the Google Identity Services
+// 'initialize() called multiple times' warning (StrictMode double-mounts
+// all components in development, which triggers Google's duplicate-init guard).
+// This has no impact on production builds — StrictMode only runs in dev.
 createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </StrictMode>
+  <BrowserRouter>
+    <App />
+  </BrowserRouter>
 );

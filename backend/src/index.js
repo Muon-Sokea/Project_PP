@@ -6,6 +6,8 @@ const http    = require("http");
 const express = require("express");
 const cors    = require("cors");
 const { initSocket } = require("./lib/socket");
+const cron = require("node-cron");
+const { runEventReminders } = require("./lib/reminderJob");
 
 const authRoutes          = require("./routes/auth");
 const eventRoutes         = require("./routes/events");
@@ -19,6 +21,7 @@ const userRoutes          = require("./routes/users");
 const adminRoutes         = require("./routes/admin");
 const notificationRoutes  = require("./routes/notifications");
 const bookmarkRoutes      = require("./routes/bookmarks");
+const settingsRoutes      = require("./routes/settings");
 const errorHandler        = require("./middleware/errorHandler");
 
 const app  = express();
@@ -62,6 +65,7 @@ app.use("/api/upload",        uploadRoutes);
 app.use("/api/organizer",     organizerRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/bookmarks",      bookmarkRoutes);
+app.use("/api/settings",       settingsRoutes);
 
 // Serve uploaded images statically
 app.use("/uploads", express.static("uploads"));
@@ -95,4 +99,10 @@ server.listen(PORT, "0.0.0.0", () => {
       console.log(`🌐 Network access: http://${addresses[0].address}:${PORT}`);
     }
   }
+});
+
+// Daily at 09:00 server time — emails attendees whose booked event is
+// happening tomorrow. Safe to re-run (reminderSentAt guards duplicates).
+cron.schedule("0 9 * * *", () => {
+  runEventReminders().catch(err => console.error("Event reminder job failed:", err.message));
 });

@@ -339,88 +339,89 @@ async function fetchReportData(startDate, endDate) {
   } } : {};
   const testimonialsWhere = { createdAt: dateRange.createdAt };
 
+  // ── Helper: safe query with fallback ────────────────────────────────────
+  async function safeQuery(label, queryFn, fallback) {
+    try {
+      const result = await queryFn();
+      return result;
+    } catch (err) {
+      console.warn(`[report-data] Failed to fetch ${label}:`, err.message);
+      return fallback;
+    }
+  }
+
   // ── Users ──────────────────────────────────────────────────────────────
-  const users = await prisma.user.findMany({
-    where: usersWhere,
-    select: {
-      id: true, firstName: true, lastName: true, email: true,
-      role: true, status: true, phone: true, address: true,
-      createdAt: true, updatedAt: true,
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const users = await safeQuery("users", () =>
+    prisma.user.findMany({
+      where: usersWhere,
+      select: { id: true, firstName: true, lastName: true, email: true, role: true, status: true, phone: true, address: true, createdAt: true, updatedAt: true, deletedAt: true },
+      orderBy: { createdAt: "desc" },
+    }), []);
 
   // ── Events ──────────────────────────────────────────────────────────────
-  const events = await prisma.event.findMany({
-    where: eventsWhere,
-    include: {
-      organizer: { select: { firstName: true, lastName: true, email: true } },
-      _count: { select: { tickets: true, testimonials: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const events = await safeQuery("events", () =>
+    prisma.event.findMany({
+      where: eventsWhere,
+      include: { organizer: { select: { firstName: true, lastName: true, email: true } }, _count: { select: { tickets: true, testimonials: true } } },
+      orderBy: { createdAt: "desc" },
+    }), []);
   const eventsData = events.map((e) => ({
-    id: e.id, title: e.title, description: e.description,
-    date: e.date, location: e.location, capacity: e.capacity,
-    price: Number(e.price), category: e.category,
+    id: e.id, title: e.title || "", description: (e.description || "").substring(0, 200),
+    date: e.date, location: e.location || "", capacity: e.capacity || 0,
+    price: Number(e.price || 0), category: e.category || "General",
     published: e.published, createdAt: e.createdAt,
-    organizer: e.organizer ? `${e.organizer.firstName} ${e.organizer.lastName}` : "—",
+    organizer: e.organizer ? `${e.organizer.firstName || ""} ${e.organizer.lastName || ""}`.trim() || "—" : "—",
     organizerEmail: e.organizer?.email || "—",
-    ticketsSold: e._count.tickets,
-    testimonials: e._count.testimonials,
-    revenue: e._count.tickets * Number(e.price),
+    ticketsSold: e._count?.tickets ?? 0,
+    testimonials: e._count?.testimonials ?? 0,
+    revenue: (e._count?.tickets ?? 0) * Number(e.price || 0),
   }));
 
   // ── Tickets ─────────────────────────────────────────────────────────────
-  const tickets = await prisma.ticket.findMany({
-    where: ticketsWhere,
-    include: {
-      user:  { select: { firstName: true, lastName: true, email: true, role: true } },
-      event: { select: { title: true, category: true } },
-    },
-    orderBy: { registeredAt: "desc" },
-  });
+  const tickets = await safeQuery("tickets", () =>
+    prisma.ticket.findMany({
+      where: ticketsWhere,
+      include: { user: { select: { firstName: true, lastName: true, email: true, role: true } }, event: { select: { title: true, category: true } } },
+      orderBy: { registeredAt: "desc" },
+    }), []);
   const ticketsData = tickets.map((t) => ({
-    id: t.id, ticketCode: t.ticketCode, ticketType: t.ticketType,
-    quantity: t.quantity, price: Number(t.price), status: t.status,
+    id: t.id, ticketCode: t.ticketCode || "", ticketType: t.ticketType || "",
+    quantity: t.quantity || 1, price: Number(t.price || 0), status: t.status || "unknown",
     registeredAt: t.registeredAt,
-    buyer: `${t.user.firstName} ${t.user.lastName}`,
-    buyerEmail: t.user.email,
-    buyerRole: t.user.role,
-    eventTitle: t.event.title,
-    eventCategory: t.event.category,
-    totalAmount: Number(t.price) * t.quantity,
+    buyer: t.user ? `${t.user.firstName || ""} ${t.user.lastName || ""}`.trim() || "—" : "—",
+    buyerEmail: t.user?.email || "—",
+    buyerRole: t.user?.role || "—",
+    eventTitle: t.event?.title || "Unknown Event",
+    eventCategory: t.event?.category || "—",
+    totalAmount: Number(t.price || 0) * (t.quantity || 1),
   }));
 
   // ── Refunds ─────────────────────────────────────────────────────────────
-  const refunds = await prisma.refund.findMany({
-    where: refundsWhere,
-    include: {
-      user: { select: { firstName: true, lastName: true, email: true } },
-    },
-    orderBy: { requestedAt: "desc" },
-  });
+  const refunds = await safeQuery("refunds", () =>
+    prisma.refund.findMany({
+      where: refundsWhere,
+      include: { user: { select: { firstName: true, lastName: true, email: true } } },
+      orderBy: { requestedAt: "desc" },
+    }), []);
   const refundsData = refunds.map((r) => ({
-    id: r.id, ticketCode: r.ticketCode, eventName: r.eventName,
-    reason: r.reason, details: r.details, status: r.status,
+    id: r.id, ticketCode: r.ticketCode || "", eventName: r.eventName || "",
+    reason: r.reason || "", details: r.details || "", status: r.status || "pending",
     requestedAt: r.requestedAt, resolvedAt: r.resolvedAt,
-    user: `${r.user.firstName} ${r.user.lastName}`,
-    userEmail: r.user.email,
+    user: r.user ? `${r.user.firstName || ""} ${r.user.lastName || ""}`.trim() || "—" : "—",
+    userEmail: r.user?.email || "—",
   }));
 
   // ── Testimonials ────────────────────────────────────────────────────────
-  const testimonials = await prisma.testimonial.findMany({
-    where: testimonialsWhere,
-    include: {
-      user:  { select: { firstName: true, lastName: true } },
-      event: { select: { title: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const testimonials = await safeQuery("testimonials", () =>
+    prisma.testimonial.findMany({
+      where: testimonialsWhere,
+      include: { user: { select: { firstName: true, lastName: true } }, event: { select: { title: true } } },
+      orderBy: { createdAt: "desc" },
+    }), []);
   const testimonialsData = testimonials.map((t) => ({
-    id: t.id, content: t.content, rating: t.rating,
+    id: t.id, content: t.content || "", rating: t.rating || 0,
     createdAt: t.createdAt,
-    user: `${t.user.firstName} ${t.user.lastName}`,
+    user: t.user ? `${t.user.firstName || ""} ${t.user.lastName || ""}`.trim() || "—" : "—",
     eventTitle: t.event?.title || "—",
   }));
 
@@ -441,6 +442,7 @@ async function fetchReportData(startDate, endDate) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const label = d.toLocaleString("en-US", { month: "short", year: "numeric" });
     const monthTickets = confirmedTickets.filter((t) => {
+      if (!t.registeredAt) return false;
       const td = new Date(t.registeredAt);
       return td.getMonth() === d.getMonth() && td.getFullYear() === d.getFullYear();
     });
@@ -449,29 +451,31 @@ async function fetchReportData(startDate, endDate) {
   }
 
   // Events by category
-  const categoryGroups = await prisma.event.groupBy({
-    by: ["category"], _count: { id: true },
-    where: eventsWhere,
-    orderBy: { _count: { id: "desc" } },
-  });
-  const eventsByCategory = categoryGroups.map((g) => ({
-    category: g.category, count: g._count.id,
+  const categoryGroups = await safeQuery("events by category", () =>
+    prisma.event.groupBy({
+      by: ["category"], _count: { id: true },
+      where: eventsWhere,
+      orderBy: { _count: { id: "desc" } },
+    }), []);
+  const eventsByCategory = (categoryGroups || []).map((g) => ({
+    category: g.category, count: g._count?.id ?? 0,
   }));
 
   // Users by role
-  const roleGroups = await prisma.user.groupBy({
-    by: ["role"], _count: { id: true },
-    where: usersWhere,
-  });
-  const usersByRole = roleGroups.map((g) => ({
-    role: g.role, count: g._count.id,
+  const roleGroups = await safeQuery("users by role", () =>
+    prisma.user.groupBy({
+      by: ["role"], _count: { id: true },
+      where: usersWhere,
+    }), []);
+  const usersByRole = (roleGroups || []).map((g) => ({
+    role: g.role, count: g._count?.id ?? 0,
   }));
 
-  // Total counts (unfiltered)
+  // Total counts (unfiltered) — each wrapped individually so one failure doesn't block the others
   const [totalUsersAll, totalEventsAll, totalTicketsAll] = await Promise.all([
-    prisma.user.count(),
-    prisma.event.count(),
-    prisma.ticket.count(),
+    safeQuery("total user count", () => prisma.user.count(), 0),
+    safeQuery("total event count", () => prisma.event.count(), 0),
+    safeQuery("total ticket count", () => prisma.ticket.count(), 0),
   ]);
 
   return {

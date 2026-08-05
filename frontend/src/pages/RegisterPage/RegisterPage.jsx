@@ -102,11 +102,12 @@ export default function RegisterPage() {
   // ── verify card ──────────────────────────────────────────────────────────
   const [userId,          setUserId]          = useState(null);
   const [registeredEmail, setRegisteredEmail] = useState('');
-  const [verifyCode,      setVerifyCode]      = useState('');
+  const [verifyDigits,    setVerifyDigits]    = useState(['', '', '', '', '', '']);
   const [verifyError,     setVerifyError]     = useState('');
   const [verifyLoading,   setVerifyLoading]   = useState(false);
   const [verifySuccess,   setVerifySuccess]   = useState(false);
   const [resendSecs,      setResendSecs]      = useState(0);
+  const verifyRefs = useRef([]);
 
   // ── field refs for shake ─────────────────────────────────────────────────
   const firstRef   = useRef(null);
@@ -225,8 +226,11 @@ export default function RegisterPage() {
       });
       setUserId(data.user_id);
       setRegisteredEmail(data.email);
+      setVerifyDigits(['', '', '', '', '', '']);
+      setVerifyError('');
       setStep('verify');
       setResendSecs(60);
+      setTimeout(() => verifyRefs.current[0]?.focus(), 50);
     } catch (err) {
       const msg = err.message || String(err);
       setErrors(e => ({ ...e, email: msg }));
@@ -237,16 +241,32 @@ export default function RegisterPage() {
   }
 
   // ── verify email ──────────────────────────────────────────────────────────
+  function handleVerifyDigitChange(idx, val) {
+    const digit = val.replace(/[^0-9]/g, '').slice(-1);
+    const next = [...verifyDigits];
+    next[idx] = digit;
+    setVerifyDigits(next);
+    if (digit && idx < 5) verifyRefs.current[idx + 1]?.focus();
+  }
+
+  function handleVerifyDigitKeydown(idx, e) {
+    if (e.key === 'Backspace' && !verifyDigits[idx] && idx > 0) {
+      verifyRefs.current[idx - 1]?.focus();
+    }
+    if (e.key === 'Enter') handleVerify();
+  }
+
   async function handleVerify() {
     if (verifyLoading || verifySuccess) return;
     setVerifyError('');
-    if (!/^\d{6}$/.test(verifyCode.trim())) {
+    const code = verifyDigits.join('');
+    if (!/^\d{6}$/.test(code)) {
       setVerifyError('Enter the 6-digit code from your email.');
       return;
     }
     setVerifyLoading(true);
     try {
-      await apiVerifyEmail(userId, verifyCode.trim());
+      await apiVerifyEmail(userId, code);
       syncSession();
       setVerifySuccess(true);
       launchConfetti();
@@ -268,6 +288,18 @@ export default function RegisterPage() {
     } catch (err) {
       setVerifyError(err.message || String(err));
     }
+  }
+
+  // Lets someone who mistyped their email back out of the OTP step instead of
+  // being stuck waiting on a code that can never arrive. Goes back to the
+  // registration form (not /login) with everything they'd already typed
+  // still in place, so they only need to fix the email.
+  function handleChangeEmail() {
+    setVerifyError('');
+    setVerifyDigits(['', '', '', '', '', '']);
+    setResendSecs(0);
+    setStep('form');
+    setTimeout(() => emailRef.current?.querySelector('input')?.focus(), 50);
   }
 
   function socialComingSoon(name) {
@@ -447,9 +479,9 @@ export default function RegisterPage() {
                   onChange={e => { setTermsAccepted(e.target.checked); if (e.target.checked) setErrors(er => ({ ...er, terms: '' })); }} />
                 <span>
                   I agree to the{' '}
-                  <Link to="/terms" className="terms-link" target="_blank">Terms &amp; Conditions</Link>
+                  <Link to="/terms?from=register" className="terms-link" target="_blank">Terms &amp; Conditions</Link>
                   {' '}and{' '}
-                  <Link to="/privacy" className="terms-link" target="_blank">Privacy Policy</Link>
+                  <Link to="/privacy?from=register" className="terms-link" target="_blank">Privacy Policy</Link>
                 </span>
               </label>
               <div className="field-error terms-error" role="alert">{errors.terms}</div>
@@ -498,6 +530,10 @@ export default function RegisterPage() {
         {/* ── Email verification card ── */}
         {step === 'verify' && (
           <div className="card verify-card">
+            <button className="auth-back" onClick={handleChangeEmail}>
+              <i className="ri-arrow-left-line" /> Back to create account
+            </button>
+
             <div className="verify-icon">
               <i className="ri-mail-check-line" />
             </div>
@@ -506,47 +542,39 @@ export default function RegisterPage() {
               We sent a 6-digit code to <strong>{registeredEmail}</strong>
             </p>
 
-            <div className="field" style={{ marginTop: 24 }}>
-              <input
-                type="text"
-                id="verifyCode"
-                placeholder=" "
-                maxLength={6}
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                value={verifyCode}
-                style={{ letterSpacing: 6, fontSize: 22, textAlign: 'center' }}
-                onChange={e => setVerifyCode(e.target.value.replace(/\D/g, ''))}
-                onKeyDown={e => e.key === 'Enter' && handleVerify()}
-                autoFocus
-              />
-              <label htmlFor="verifyCode">Verification code</label>
-              <div className="field-error" role="alert">{verifyError}</div>
+            <div className="otp-row">
+              {verifyDigits.map((digit, i) => (
+                <input
+                  key={i} type="text" inputMode="numeric" className={`otp-input${digit ? ' filled' : ''}`}
+                  maxLength={1} value={digit}
+                  ref={el => { verifyRefs.current[i] = el; }}
+                  onChange={e => handleVerifyDigitChange(i, e.target.value)}
+                  onKeyDown={e => handleVerifyDigitKeydown(i, e)}
+                  disabled={verifySuccess}
+                />
+              ))}
             </div>
+            {verifyError && <div className="otp-error" role="alert">{verifyError}</div>}
 
             <button
               className={`cta${verifyLoading ? ' loading' : ''}${verifySuccess ? ' success' : ''}`}
               onClick={handleVerify}
               disabled={verifyLoading || verifySuccess}
+              style={{ marginTop: 16 }}
             >
               <span className="spinner" aria-hidden="true" />
               <span className="label">Verify email</span>
               <span className="check" aria-hidden="true"><i className="ri-check-line" /></span>
             </button>
 
-            <p style={{ marginTop: 16, fontSize: 13, color: 'var(--text-light)' }}>
+            <p className="auth-resend">
               Didn't get it?{' '}
-              <button
-                style={{
-                  background: 'none', border: 'none', padding: 0, cursor: resendSecs > 0 ? 'default' : 'pointer',
-                  color: 'var(--primary)', fontWeight: 600, fontSize: 'inherit',
-                  opacity: resendSecs > 0 ? 0.4 : 1, pointerEvents: resendSecs > 0 ? 'none' : 'auto',
-                }}
-                onClick={handleResend}
-              >
-                Resend code
+              <button className="auth-resend-link" onClick={handleResend} disabled={resendSecs > 0}>
+                Resend code{resendSecs > 0 ? ` (${resendSecs}s)` : ''}
               </button>
-              {resendSecs > 0 && <span> ({resendSecs}s)</span>}
+            </p>
+            <p className="auth-alt-action">
+              Wrong email? <button onClick={handleChangeEmail}>Change it</button>
             </p>
           </div>
         )}

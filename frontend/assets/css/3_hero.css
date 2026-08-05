@@ -94,6 +94,63 @@
   animation: slideUp 0.6s ease-out 0.24s both;
 }
 
+/* ── Hero promotions strip ── */
+.hero-promo-strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 22px;
+  animation: slideUp 0.6s ease-out 0.36s both;
+}
+.hero-promo-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.14);
+  border: 1px solid rgba(255,255,255,0.35);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+.hero-promo-card:hover {
+  background: rgba(255,255,255,0.24);
+  transform: translateY(-2px);
+}
+.hero-promo-pct {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--primary, #F5A623);
+  background: #fff;
+  padding: 1px 8px;
+  border-radius: 20px;
+}
+.hero-promo-title {
+  font-size: 13px;
+  font-weight: 600;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hero-promo-code {
+  font-size: 11px;
+  color: rgba(255,255,255,0.75);
+  letter-spacing: 0.4px;
+}
+
+@media (max-width: 480px) {
+  .hero-promo-strip { gap: 8px; }
+  .hero-promo-card { padding: 8px 12px; }
+  .hero-promo-title { max-width: 140px; }
+}
+
 /* ── Search bar ── */
 .search-bar {
   display: flex;
