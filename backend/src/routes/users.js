@@ -13,12 +13,37 @@ function safeUser(user) {
   return rest;
 }
 
+// Permanently deletes a user and every record tied to them (tickets, refunds,
+// testimonials, bookmarks, login history, notifications). Refuses to touch a
+// user who still organizes events — Event.organizerId is required, so deleting
+// them would either fail outright or cascade into OTHER users' tickets and
+// testimonials for those events, which is data loss far outside "this user's
+// own information". Caller must reassign or delete those events first.
+async function hardDeleteUser(userId) {
+  const organizedCount = await prisma.event.count({ where: { organizerId: userId } });
+  if (organizedCount > 0) {
+    const err = new Error(
+      `This user still organizes ${organizedCount} event(s). Reassign or delete those events before deleting the account.`
+    );
+    err.code = "HAS_EVENTS";
+    throw err;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.refund.deleteMany({ where: { userId } });
+    await tx.ticket.deleteMany({ where: { userId } });
+    await tx.testimonial.deleteMany({ where: { userId } });
+    await tx.bookmark.deleteMany({ where: { userId } });
+    await tx.loginEvent.deleteMany({ where: { userId } });
+    await tx.notification.deleteMany({ where: { userId } });
+    await tx.user.delete({ where: { id: userId } });
+  });
+}
+
 // GET /api/users  (Admin / Supervisor)
-// Excludes soft-deleted users — they're hidden everywhere in the live app,
-// but still fully intact in the database for report exports (see DELETE below).
 router.get("/", requireAuth, requireRole("Supervisor", "Admin"), async (req, res, next) => {
   try {
-    const users = await prisma.user.findMany({ where: { deletedAt: null }, orderBy: { createdAt: "asc" } });
+    const users = await prisma.user.findMany({ orderBy: { createdAt: "asc" } });
     res.json(users.map(safeUser));
   } catch (err) { next(err); }
 });
@@ -95,29 +120,74 @@ router.put("/:id", requireAuth, async (req, res, next) => {
 });
 
 // DELETE /api/users/:id  (Supervisor only)
-// Soft delete — Supervisor has full authority to remove a user from the live
-// app immediately (login blocked, hidden from user lists) with no permission
-// prompts or foreign-key errors in the way. Nothing is physically destroyed:
-// their events, tickets, refunds, testimonials, and bookmarks stay exactly as
-// they were, so report exports (PDF/CSV) still show the full history as
-// evidence if a dispute ever comes up.
+// Permanent delete — removes the user and every record tied to them (tickets,
+// refunds, testimonials, bookmarks, login history, notifications). Cannot be
+// undone. See hardDeleteUser() above for the one guard: a user who still
+// organizes events must have those reassigned/deleted first.
 router.delete("/:id", requireAuth, requireRole("Supervisor"), async (req, res, next) => {
   try {
     const targetId = Number(req.params.id);
     if (req.user.id === targetId) return res.status(400).json({ error: "Cannot delete your own account." });
 
     const target = await prisma.user.findUnique({ where: { id: targetId } });
-    if (!target || target.deletedAt) return res.status(404).json({ error: "User not found." });
+    if (!target) return res.status(404).json({ error: "User not found." });
+    if (target.role === "Supervisor") return res.status(403).json({ error: "Cannot delete a Supervisor account." });
 
-    await prisma.user.update({
-      where: { id: targetId },
-      data: { deletedAt: new Date(), status: "suspended" },
-    });
+    try {
+      await hardDeleteUser(targetId);
+    } catch (err) {
+      if (err.code === "HAS_EVENTS") return res.status(409).json({ error: err.message });
+      throw err;
+    }
+
     broadcastAdminUpdate(["users"]);
     res.json({ message: "User deleted." });
 
     // Notify all admins that a user was deleted
     try { getIO().emit("user-update", { action: "deleted", userId: targetId }); } catch {}
+  } catch (err) { next(err); }
+});
+
+// POST /api/users/bulk-delete  (Supervisor only) — up to 10 at a time
+// Same permanent-delete semantics as the single DELETE above, just batched.
+// A user blocked by owned events doesn't abort the whole batch — they're
+// reported back as "blocked" alongside the counts that did succeed.
+router.post("/bulk-delete", requireAuth, requireRole("Supervisor"), async (req, res, next) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0)
+      return res.status(400).json({ error: "ids must be a non-empty array." });
+    if (ids.length > 10)
+      return res.status(400).json({ error: "You can delete at most 10 users at a time." });
+
+    const targetIds = [...new Set(ids.map(Number))].filter(id => id !== req.user.id);
+    const targets = await prisma.user.findMany({ where: { id: { in: targetIds } } });
+    const deletable = targets.filter(u => u.role !== "Supervisor");
+
+    let deleted = 0;
+    let blocked = 0;
+    const deletedIds = [];
+    for (const u of deletable) {
+      try {
+        await hardDeleteUser(u.id);
+        deleted++;
+        deletedIds.push(u.id);
+      } catch (err) {
+        if (err.code === "HAS_EVENTS") { blocked++; continue; }
+        throw err;
+      }
+    }
+
+    if (deleted > 0) {
+      broadcastAdminUpdate(["users"]);
+      try { getIO().emit("user-update", { action: "deleted", userIds: deletedIds }); } catch {}
+    }
+
+    res.json({
+      deleted,
+      blocked,
+      skipped: ids.length - deletable.length,
+    });
   } catch (err) { next(err); }
 });
 

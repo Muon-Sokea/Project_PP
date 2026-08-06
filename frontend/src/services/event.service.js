@@ -36,6 +36,10 @@ export async function apiRejectEvent(id) {
   return http('PATCH', `/events/${id}/reject`);
 }
 
+export async function apiSubmitEvent(id) {
+  return http('PATCH', `/events/${id}/submit`);
+}
+
 export async function apiPromoteEvent(id, { subject, message }) {
   return http('POST', `/events/${id}/promote`, { subject, message });
 }

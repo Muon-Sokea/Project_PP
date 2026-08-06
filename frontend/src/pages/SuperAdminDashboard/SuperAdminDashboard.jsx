@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { loadLS, saveLS } from '../../utils/storage.js';
 import { fmtDate, fmtTime } from '../../utils/formatDate.js';
 import { apiGetAdminStats, apiGetAuditLogs, apiGetSystemHealth, apiGetHealthHistory, apiGetReportData, apiEmailReport } from '../../services/admin.service.js';
-import { apiGetAllUsers, apiCreateUser, apiUpdateUser, apiDeleteUser } from '../../services/user.service.js';
+import { apiGetAllUsers, apiCreateUser, apiUpdateUser, apiDeleteUser, apiBulkDeleteUsers } from '../../services/user.service.js';
 import { apiGetAllEvents, apiDeleteEvent } from '../../services/event.service.js';
 import { apiGetRefunds } from '../../services/refund.service.js';
 import { useNotifications } from '../../context/NotificationContext.jsx';
@@ -436,8 +436,11 @@ export default function SuperAdminDashboard() {
   const [eventFilter,  setEventFilter]  = useState('all');
   const [eventSearch,  setEventSearch]  = useState('');
   const [auditSearch,  setAuditSearch]  = useState('');
-  const [modal,        setModal]        = useState(null); // 'create' | 'edit' | 'delete'
+  const [modal,        setModal]        = useState(null); // 'create' | 'edit' | 'delete' | 'bulk-delete'
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [selectedUserEmails, setSelectedUserEmails] = useState([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const BULK_DELETE_CAP = 10;
   const [createForm,   setCreateForm]   = useState({ firstName:'', lastName:'', email:'', password:'', role:'Admin' });
   const [createErr,    setCreateErr]    = useState('');
   const [editTarget,   setEditTarget]   = useState(null); // email of user being edited
@@ -487,6 +490,16 @@ export default function SuperAdminDashboard() {
     return Array.from(byEmail.values());
   }, [tick, apiUsers]);
   const myEmail = (user?.email || '').toLowerCase();
+
+  // Drop any selection that no longer exists once the list refreshes (e.g.
+  // another admin deleted the same user in real time via admin:update).
+  useEffect(() => {
+    setSelectedUserEmails(prev => {
+      const stillPresent = new Set(allUsers.map(u => u.email.toLowerCase()));
+      const next = prev.filter(email => stillPresent.has(email.toLowerCase()));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [allUsers]);
 
   // ── Lazy computed data ─────────────────────────────────────────────────
   // Only compute filtered data when its tab is active to avoid unnecessary work.
@@ -665,6 +678,39 @@ export default function SuperAdminDashboard() {
     setModal(null);
     setDeleteTarget(null);
     setTick(t => t + 1);
+  }
+
+  // ── Bulk delete (up to BULK_DELETE_CAP users at once) ────────────────────
+  function toggleUserSelect(email, selectable) {
+    if (!selectable) return;
+    setSelectedUserEmails(prev => {
+      if (prev.includes(email)) return prev.filter(e => e !== email);
+      if (prev.length >= BULK_DELETE_CAP) return prev; // cap reached, ignore
+      return [...prev, email];
+    });
+  }
+
+  async function confirmBulkDelete() {
+    const targets = selectedUserEmails
+      .map(email => apiUsers.find(au => au.email.toLowerCase() === email.toLowerCase()))
+      .filter(Boolean);
+    if (targets.length === 0) { setModal(null); return; }
+
+    setBulkDeleting(true);
+    try {
+      const result = await apiBulkDeleteUsers(targets.map(u => u.id));
+      const refreshed = await apiGetAllUsers();
+      setApiUsers(Array.isArray(refreshed) ? refreshed : []);
+      setSelectedUserEmails([]);
+      setModal(null);
+      if (result?.blocked > 0) {
+        alert(`${result.deleted} user(s) deleted. ${result.blocked} skipped because they still organize events — reassign or delete those events first.`);
+      }
+    } catch (err) {
+      alert(err.message || 'Failed to delete selected users.');
+    } finally {
+      setBulkDeleting(false);
+    }
   }
 
   async function createUser() {
@@ -980,9 +1026,16 @@ export default function SuperAdminDashboard() {
                     <div className="section-title" style={{ margin:0 }}>
                       All Users &nbsp;<span style={{ fontSize:'13px', color:'var(--text-light)', fontWeight:400 }}>{allUsers.length} total</span>
                     </div>
-                    <button className="btn btn-primary btn-sm" onClick={() => { setCreateErr(''); setModal('create'); }}>
-                      <i className="ri-user-add-line" /> Add User
-                    </button>
+                    <div style={{ display:'flex', gap:'10px' }}>
+                      {selectedUserEmails.length > 0 && (
+                        <button className="btn btn-danger btn-sm" onClick={() => setModal('bulk-delete')}>
+                          <i className="ri-delete-bin-line" /> Delete Selected ({selectedUserEmails.length})
+                        </button>
+                      )}
+                      <button className="btn btn-primary btn-sm" onClick={() => { setCreateErr(''); setModal('create'); }}>
+                        <i className="ri-user-add-line" /> Add User
+                      </button>
+                    </div>
                   </div>
 
                   <div className="sa-role-filter">
@@ -996,20 +1049,40 @@ export default function SuperAdminDashboard() {
                     <input type="text" placeholder="Search users..." value={userSearch} onChange={e => setUserSearch(e.target.value)} />
                   </div>
 
+                  {selectedUserEmails.length > 0 && (
+                    <div style={{ fontSize:'12px', color:'var(--text-light)', margin:'0 0 10px' }}>
+                      {selectedUserEmails.length}/{BULK_DELETE_CAP} selected — max {BULK_DELETE_CAP} users per bulk delete.
+                    </div>
+                  )}
+
                   <div style={{ overflowX:'auto' }}>
                     <table className="data-table">
-                      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+                      <thead><tr><th style={{ width:36 }}></th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
                       <tbody>
                         {filteredUsers.length === 0 ? (
-                          <tr><td colSpan={6} style={{ textAlign:'center', padding:'26px', color:'var(--text-light)' }}>No users match this filter.</td></tr>
+                          <tr><td colSpan={7} style={{ textAlign:'center', padding:'26px', color:'var(--text-light)' }}>No users match this filter.</td></tr>
                         ) : filteredUsers.map((u, i) => {
                           const [bg, fg] = AVATAR_CLR[u.role] || ['#e2e8f0','#475569'];
                           const isSelf = u.email.toLowerCase() === myEmail;
                           const isSA   = u.role === 'Supervisor';
                           const name   = `${u.firstName} ${u.lastName}`.trim() || u.email;
                           const init   = (u.firstName || u.email || '?').charAt(0).toUpperCase();
+                          const selectable = u.src === 'database' && !isSelf && !isSA;
+                          const isChecked  = selectedUserEmails.includes(u.email);
+                          const capReached = !isChecked && selectedUserEmails.length >= BULK_DELETE_CAP;
                           return (
                             <tr key={i} className={u.status === 'Suspended' ? 'sa-muted-row' : ''}>
+                              <td>
+                                {selectable && (
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    disabled={capReached}
+                                    title={capReached ? `You can only select up to ${BULK_DELETE_CAP} users at a time.` : ''}
+                                    onChange={() => toggleUserSelect(u.email, selectable)}
+                                  />
+                                )}
+                              </td>
                               <td><div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
                                 <div className="avatar-circle" style={{ background:bg, color:fg }}>{init}</div>{name}
                               </div></td>
@@ -1757,11 +1830,40 @@ export default function SuperAdminDashboard() {
             <button className="m-close" onClick={() => setModal(null)}>&times;</button>
           </div>
           <p className="sa-modal-text">
-            Are you sure you want to delete <strong>{deleteUser ? `${deleteUser.firstName} ${deleteUser.lastName}`.trim() || deleteUser.email : ''}</strong>? This cannot be undone.
+            Are you sure you want to permanently delete <strong>{deleteUser ? `${deleteUser.firstName} ${deleteUser.lastName}`.trim() || deleteUser.email : ''}</strong>? Their tickets, refunds, testimonials, bookmarks and login history will be erased too. This cannot be undone.
           </p>
           <div className="sa-modal-actions">
             <button className="btn btn-outline" onClick={() => setModal(null)}>Cancel</button>
             <button className="btn btn-danger" onClick={confirmDelete}><i className="ri-delete-bin-line" /> Delete</button>
+          </div>
+        </div>
+      </div>
+
+      <div className={`sa-modal-overlay${modal === 'bulk-delete' ? ' show' : ''}`} onClick={e => { if (e.target === e.currentTarget && !bulkDeleting) setModal(null); }}>
+        <div className="sa-modal-box">
+          <div className="sa-modal-head">
+            <div className="sa-modal-icon danger"><i className="ri-delete-bin-line" /></div>
+            <h3>Delete {selectedUserEmails.length} Users</h3>
+            <button className="m-close" onClick={() => !bulkDeleting && setModal(null)}>&times;</button>
+          </div>
+          <p className="sa-modal-text">
+            Are you sure you want to permanently delete these {selectedUserEmails.length} accounts? Each user's tickets, refunds, testimonials, bookmarks and login history will be erased too. This cannot be undone. Anyone who still organizes events will be skipped — reassign or delete their events first.
+          </p>
+          <ul style={{ maxHeight:160, overflowY:'auto', margin:'0 0 16px', padding:0, listStyle:'none', border:'1px solid var(--border)', borderRadius:8 }}>
+            {selectedUserEmails.map(email => {
+              const u = allUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+              return (
+                <li key={email} style={{ padding:'8px 12px', borderBottom:'1px solid var(--border)', fontSize:13 }}>
+                  {u ? (`${u.firstName} ${u.lastName}`.trim() || u.email) : email}
+                </li>
+              );
+            })}
+          </ul>
+          <div className="sa-modal-actions">
+            <button className="btn btn-outline" disabled={bulkDeleting} onClick={() => setModal(null)}>Cancel</button>
+            <button className="btn btn-danger" disabled={bulkDeleting} onClick={confirmBulkDelete}>
+              {bulkDeleting ? <><i className="ri-loader-4-line ri-spin" /> Deleting...</> : <><i className="ri-delete-bin-line" /> Delete {selectedUserEmails.length} Users</>}
+            </button>
           </div>
         </div>
       </div>

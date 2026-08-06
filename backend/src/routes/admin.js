@@ -15,7 +15,7 @@ router.get("/stats", requireAuth, requireRole("Supervisor", "Admin"), async (req
   try {
     // ── Totals ────────────────────────────────────────────────────────────
     const totalUsers    = await prisma.user.count();
-    const totalEvents   = await prisma.event.count();
+    const totalEvents   = await prisma.event.count({ where: { isDraft: false } });
 
     // ── Tickets / Revenue ─────────────────────────────────────────────────
     const confirmedTickets = await prisma.ticket.findMany({
@@ -112,8 +112,9 @@ router.get("/audit-logs", requireAuth, requireRole("Supervisor", "Admin"), async
       });
     });
 
-    // Recent events created
+    // Recent events created — drafts are never surfaced to admins, even here
     const recentEvents = await prisma.event.findMany({
+      where:   { isDraft: false },
       orderBy: { createdAt: "desc" },
       take:    20,
       include: { organizer: { select: { firstName: true, lastName: true, role: true } } },
@@ -123,7 +124,7 @@ router.get("/audit-logs", requireAuth, requireRole("Supervisor", "Admin"), async
         ts:    e.createdAt,
         user:  e.organizer ? `${e.organizer.firstName} ${e.organizer.lastName}` : "Unknown",
         role:  e.organizer?.role || "—",
-        action: e.published ? "Published event" : "Created event (draft)",
+        action: e.published ? "Published event" : "Submitted event for approval",
         ip:    "—",
         ok:    true,
       });
@@ -323,7 +324,7 @@ async function fetchReportData(startDate, endDate) {
   };
 
   const usersWhere      = { createdAt: dateRange.createdAt };
-  const eventsWhere     = { createdAt: dateRange.createdAt };
+  const eventsWhere     = { createdAt: dateRange.createdAt, isDraft: false };
   const ticketsWhere    = hasFilter ? { registeredAt: {
     ...(start ? { gte: start } : {}),
     ...(end   ? { lte: end }   : {}),
@@ -349,7 +350,7 @@ async function fetchReportData(startDate, endDate) {
   const users = await safeQuery("users", () =>
     prisma.user.findMany({
       where: usersWhere,
-      select: { id: true, firstName: true, lastName: true, email: true, role: true, status: true, phone: true, address: true, createdAt: true, updatedAt: true, deletedAt: true },
+      select: { id: true, firstName: true, lastName: true, email: true, role: true, status: true, phone: true, address: true, createdAt: true, updatedAt: true },
       orderBy: { createdAt: "desc" },
     }), []);
 
@@ -469,7 +470,7 @@ async function fetchReportData(startDate, endDate) {
   // Total counts (unfiltered) — each wrapped individually so one failure doesn't block the others
   const [totalUsersAll, totalEventsAll, totalTicketsAll] = await Promise.all([
     safeQuery("total user count", () => prisma.user.count(), 0),
-    safeQuery("total event count", () => prisma.event.count(), 0),
+    safeQuery("total event count", () => prisma.event.count({ where: { isDraft: false } }), 0),
     safeQuery("total ticket count", () => prisma.ticket.count(), 0),
   ]);
 

@@ -55,9 +55,11 @@ router.get("/", async (req, res, next) => {
 });
 
 // GET /api/events/all  (staff only — includes unpublished & pending)
+// Admin/Supervisor never see other organizers' drafts here — a draft is only
+// ever visible on its own organizer's dashboard until they submit it.
 router.get("/all", requireAuth, requireRole("Supervisor", "Admin", "Organizer"), async (req, res, next) => {
   try {
-    const where = req.user.role === "Organizer" ? { organizerId: req.user.id } : {};
+    const where = req.user.role === "Organizer" ? { organizerId: req.user.id } : { isDraft: false };
     const eventsRaw = await prisma.event.findMany({
       where,
       orderBy: { date: "asc" },
@@ -101,7 +103,20 @@ router.get("/:id", async (req, res, next) => {
       };
     }
 
-    // Non-approved events are only visible to the organizer and admins
+    // A draft is fully private to its organizer — not even staff can see it,
+    // by design (this is the whole point of "draft" vs "pending approval").
+    if (event.isDraft) {
+      const token = req.headers.authorization?.slice(7);
+      if (token) {
+        try {
+          const decoded = jwt.verify(token, process.env.JWT_SECRET);
+          if (decoded.id === event.organizerId) return res.json(await withAttending(event));
+        } catch {}
+      }
+      return res.status(404).json({ error: "Event not found." });
+    }
+
+    // Non-approved (but submitted) events are visible to the organizer and admins
     if (event.approvalStatus !== "APPROVED") {
       const token = req.headers.authorization?.slice(7);
       if (token) {
@@ -124,13 +139,19 @@ router.get("/:id", async (req, res, next) => {
 // POST /api/events  (Organizer / Admin / Supervisor — created as PENDING, not published)
 router.post("/", requireAuth, requireRole("Supervisor", "Admin", "Organizer"), async (req, res, next) => {
   try {
-    const { title, description = "", date, time = "", location, capacity = 100, price = 0, category = "General", image = "", agenda = [], ticketTypes = [], promoCode, promoDiscountPercent } = req.body;
+    const { title, description = "", date, time = "", location, capacity = 100, price = 0, category = "General", image = "", agenda = [], ticketTypes = [], promoCode, promoDiscountPercent, isDraft: rawIsDraft } = req.body;
     if (!title || !date || !location) return res.status(400).json({ error: "title, date and location are required." });
 
     const cleanPromo = normalizePromo(promoCode, promoDiscountPercent);
+    // A draft never enters the approval workflow — approvalStatus stays PENDING
+    // as an inert default (unused until the organizer submits it), and admins
+    // are never notified.
+    const isDraft = Boolean(rawIsDraft);
 
     // Organizers create events as pending approval; Admin/Supervisor can set to approved directly
-    const approvalStatus = (req.user.role === "Supervisor" || req.user.role === "Admin") ? "APPROVED" : "PENDING";
+    const approvalStatus = isDraft
+      ? "PENDING"
+      : (req.user.role === "Supervisor" || req.user.role === "Admin") ? "APPROVED" : "PENDING";
 
     const cleanTypes = Array.isArray(ticketTypes)
       ? ticketTypes
@@ -156,6 +177,7 @@ router.post("/", requireAuth, requireRole("Supervisor", "Admin", "Organizer"), a
         agenda: Array.isArray(agenda) ? agenda : [],
         organizerId: req.user.id,
         approvalStatus,
+        isDraft,
         promoCode: cleanPromo.promoCode,
         promoDiscountPercent: cleanPromo.promoDiscountPercent,
         // Auto-publish if approved
@@ -165,7 +187,7 @@ router.post("/", requireAuth, requireRole("Supervisor", "Admin", "Organizer"), a
       include: { ticketTypes: true },
     });
 
-    if (approvalStatus === "PENDING") {
+    if (!isDraft && approvalStatus === "PENDING") {
       notifyRoles(["Admin", "Supervisor"], {
         type: "event_pending",
         title: "New event awaiting approval",
@@ -217,8 +239,10 @@ router.put("/:id", requireAuth, requireRole("Supervisor", "Admin", "Organizer"),
     // An Organizer editing an already-approved (or rejected) event sends it
     // back to PENDING — admin approved/reviewed the *previous* content, not
     // whatever the organizer just changed it to. Admin/Supervisor edits don't
-    // need this, since they can self-approve.
-    const needsReapproval = req.user.role === "Organizer" && event.approvalStatus !== "PENDING";
+    // need this, since they can self-approve. A draft is never part of the
+    // approval workflow, so editing one never triggers re-approval either —
+    // isDraft itself is only ever changed by POST /:id/submit below.
+    const needsReapproval = req.user.role === "Organizer" && !event.isDraft && event.approvalStatus !== "PENDING";
 
     const updated = await prisma.event.update({
       where: { id: Number(req.params.id) },
@@ -246,6 +270,37 @@ router.put("/:id", requireAuth, requireRole("Supervisor", "Admin", "Organizer"),
     }
     broadcastAdminUpdate(["events"]);
 
+    broadcastEventUpdate("updated", { id: updated.id, title: updated.title })
+      .catch(err => console.warn("broadcastEventUpdate failed:", err.message));
+
+    res.json(updated);
+  } catch (err) { next(err); }
+});
+
+// PATCH /api/events/:id/submit  (Organizer only) — the one moment a draft
+// actually enters the approval workflow: flips isDraft off, sets PENDING,
+// and notifies admins for the first time.
+router.patch("/:id/submit", requireAuth, requireRole("Organizer"), async (req, res, next) => {
+  try {
+    const event = await prisma.event.findUnique({ where: { id: Number(req.params.id) } });
+    if (!event) return res.status(404).json({ error: "Event not found." });
+    if (event.organizerId !== req.user.id) return res.status(403).json({ error: "You can only submit your own events." });
+    if (!event.isDraft) return res.status(400).json({ error: "This event is not a draft." });
+
+    const updated = await prisma.event.update({
+      where: { id: event.id },
+      data:  { isDraft: false, approvalStatus: "PENDING", published: false },
+      include: { ticketTypes: true },
+    });
+
+    notifyRoles(["Admin", "Supervisor"], {
+      type: "event_pending",
+      title: "New event awaiting approval",
+      message: `"${updated.title}" was submitted by ${req.user.email} and needs review.`,
+      link: `/admin`,
+    }).catch(err => console.warn("notifyRoles failed:", err.message));
+
+    broadcastAdminUpdate(["events"]);
     broadcastEventUpdate("updated", { id: updated.id, title: updated.title })
       .catch(err => console.warn("broadcastEventUpdate failed:", err.message));
 
@@ -410,7 +465,7 @@ router.patch("/:id/approve", requireAuth, requireRole("Supervisor", "Admin"), as
 
 async function notifyAllUsersOfNewEvent(event) {
   const users = await prisma.user.findMany({
-    where: { deletedAt: null, status: "active" },
+    where: { status: "active" },
     select: { email: true, notificationPrefs: true },
   });
   const eventDate = event.date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });

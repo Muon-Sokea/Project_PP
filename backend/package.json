@@ -12,7 +12,7 @@
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
-    "db:studio": "prisma studio --port 5555"
+    "db:studio": "node scripts/db-studio.js"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

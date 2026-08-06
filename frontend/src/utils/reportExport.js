@@ -778,7 +778,7 @@ export async function generatePDFReport(reportData) {
       `${u.firstName} ${u.lastName}`.substring(0, 22),
       u.email.substring(0, 26),
       u.role,
-      u.deletedAt ? 'Deleted' : (u.status === 'active' || u.status === 'Active' ? 'Active' : 'Suspended'),
+      u.status === 'active' || u.status === 'Active' ? 'Active' : 'Suspended',
       formatDate(u.createdAt),
     ]),
     y,
@@ -959,12 +959,11 @@ export async function generateExcelReport(reportData) {
 
   // ── Sheet: Users ─────────────────────────────────────────────────────────
   addSheet(wb, XLSX, 'Users',
-    ['ID', 'First Name', 'Last Name', 'Email', 'Role', 'Status', 'Phone', 'Address', 'Created At', 'Updated At', 'Deleted At'],
+    ['ID', 'First Name', 'Last Name', 'Email', 'Role', 'Status', 'Phone', 'Address', 'Created At', 'Updated At'],
     users.map(u => [
-      u.id, u.firstName, u.lastName, u.email, u.role, u.deletedAt ? 'Deleted' : u.status,
+      u.id, u.firstName, u.lastName, u.email, u.role, u.status,
       u.phone || '', u.address || '',
       formatDateTime(u.createdAt), formatDateTime(u.updatedAt),
-      u.deletedAt ? formatDateTime(u.deletedAt) : '',
     ]),
   );
 

@@ -13,8 +13,12 @@ router.get("/stats", requireAuth, requireRole("Supervisor", "Admin", "Organizer"
     const limit   = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
     const skip    = (page - 1) * limit;
 
-    // All staff roles (Organizer, Admin, Supervisor) see ALL events — no organizerId filter
-    const whereClause = {};
+    // An Organizer only ever sees their own events here — including their own
+    // drafts, which is the whole point of a draft. Admin/Supervisor use this
+    // same dashboard shape but must never see any organizer's drafts.
+    const whereClause = req.user.role === "Organizer"
+      ? { organizerId: req.user.id }
+      : { isDraft: false };
 
     // ── Block 1: Fetch paginated events + total count (parallel) ──
     const [events, totalEvents] = await Promise.all([
@@ -111,8 +115,9 @@ router.get("/stats", requireAuth, requireRole("Supervisor", "Admin", "Organizer"
         price: Number(e.price),
         capacity: e.capacity,
         registered: ticketCountMap[e.id] || 0,
-        status: e.published ? "published" : "draft",
+        status: e.published ? "published" : "unpublished",
         approvalStatus: e.approvalStatus,
+        isDraft: e.isDraft,
         description: e.description,
         category: e.category,
         agenda: e.agenda,

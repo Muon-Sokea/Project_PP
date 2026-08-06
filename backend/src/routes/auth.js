@@ -41,7 +41,6 @@ router.post("/login", loginLimiter, async (req, res, next) => {
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).json({ error: "Invalid email or password." });
 
-    if (user.deletedAt) return res.status(403).json({ error: "This account no longer exists." });
     if (user.status === "suspended") return res.status(403).json({ error: "Account suspended." });
 
     const token = signToken(user);
@@ -241,7 +240,6 @@ router.post("/google", async (req, res, next) => {
       });
     }
 
-    if (user.deletedAt) return res.status(403).json({ error: "This account no longer exists." });
     if (user.status === "suspended") return res.status(403).json({ error: "Account suspended." });
 
     const token = signToken(user);
@@ -290,7 +288,6 @@ router.post("/telegram", async (req, res, next) => {
       });
     }
 
-    if (user.deletedAt) return res.status(403).json({ error: "This account no longer exists." });
     if (user.status === "suspended") return res.status(403).json({ error: "Account suspended." });
 
     const token = signToken(user);

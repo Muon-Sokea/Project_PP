@@ -55,11 +55,6 @@ model User {
   notificationPrefs Json    @default("{}")
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
-  // Soft delete: Supervisor "delete" hides the account everywhere in the app
-  // (login blocked, excluded from user lists) but never removes it or its
-  // related tickets/events/refunds/testimonials/bookmarks — those stay intact
-  // as evidence and still appear in PDF/CSV report exports.
-  deletedAt     DateTime?
 
   events        Event[]       @relation("OrganizerEvents")
   tickets       Ticket[]
@@ -103,6 +98,11 @@ model Event {
   promoDiscountPercent Int?
   published       Boolean        @default(false)
   approvalStatus  ApprovalStatus @default(PENDING)
+  // A draft is saved to the organizer's own dashboard only — approvalStatus
+  // is inert while this is true (no admin notification, never returned by
+  // any admin-facing query). Flipped to false only via POST /:id/submit,
+  // which is the one moment it actually enters the approval workflow.
+  isDraft         Boolean        @default(false)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
@@ -140,7 +140,7 @@ model Bookmark {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
 
-  user   User  @relation(fields: [userId], references: [id])
+  user   User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId Int
   event  Event @relation(fields: [eventId], references: [id])
   eventId Int
@@ -160,7 +160,7 @@ model Ticket {
   registeredAt DateTime     @default(now())
   reminderSentAt DateTime?  // set once the "1 day before" reminder email goes out — prevents duplicate sends
 
-  user         User         @relation(fields: [userId], references: [id])
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId       Int
   event        Event        @relation(fields: [eventId], references: [id])
   eventId      Int
@@ -184,8 +184,8 @@ model Refund {
   requestedAt DateTime     @default(now())
   resolvedAt  DateTime?
 
-  ticket      Ticket       @relation(fields: [ticketCode], references: [ticketCode])
-  user        User         @relation(fields: [userId], references: [id])
+  ticket      Ticket       @relation(fields: [ticketCode], references: [ticketCode], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId      Int
 }
 
@@ -195,7 +195,7 @@ model Testimonial {
   rating    Int
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    Int
   event     Event?   @relation(fields: [eventId], references: [id])
   eventId   Int?

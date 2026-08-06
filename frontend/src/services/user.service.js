@@ -19,3 +19,7 @@ export async function apiCreateUser({ firstName, lastName, email, password, role
 export async function apiDeleteUser(userId) {
   return http('DELETE', `/users/${userId}`);
 }
+
+export async function apiBulkDeleteUsers(userIds) {
+  return http('POST', '/users/bulk-delete', { ids: userIds });
+}

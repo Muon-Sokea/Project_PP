@@ -35,7 +35,7 @@ function formatKhmerPhone(raw) {
 router.get("/contact", async (_req, res, next) => {
   try {
     const supervisor = await prisma.user.findFirst({
-      where: { role: "Supervisor", deletedAt: null },
+      where: { role: "Supervisor" },
       orderBy: { createdAt: "asc" },
       select: { phone: true },
     });

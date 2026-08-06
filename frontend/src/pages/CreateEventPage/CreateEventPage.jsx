@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { apiCreateEvent, apiUpdateEvent } from '../../services/event.service.js';
+import { apiCreateEvent, apiUpdateEvent, apiSubmitEvent } from '../../services/event.service.js';
 import { apiUploadImage } from '../../services/organizer.service.js';
 import '../../../assets/css/1_global.css';
 import '../../../assets/css/2_navbar.css';
@@ -159,8 +159,11 @@ export default function CreateEventPage() {
     try {
       if (editingEvent) {
         await apiUpdateEvent(editingEvent.id, buildApiData());
+        // A draft only enters the approval workflow (and notifies admins)
+        // the moment it's explicitly submitted — PUT alone never does that.
+        if (editingEvent.isDraft) await apiSubmitEvent(editingEvent.id);
       } else {
-        await apiCreateEvent(buildApiData());
+        await apiCreateEvent({ ...buildApiData(), isDraft: false });
       }
     } catch (err) {
       console.error('Failed to publish event:', err);
@@ -174,14 +177,18 @@ export default function CreateEventPage() {
     window.dispatchEvent(new CustomEvent('erms:events-updated'));
   }
 
+  // Saved only to the organizer's own dashboard — never sent for admin
+  // review, never notifies anyone, and never appears in any admin-facing list.
   async function saveDraft() {
     if (!title.trim()) { alert('Add an event title first, then save your draft.'); return; }
     setSubmitting(true);
     try {
       if (editingEvent) {
+        // Editing an existing draft (or any event) here only ever updates its
+        // content — isDraft is untouched, so a draft stays a draft.
         await apiUpdateEvent(editingEvent.id, buildApiData());
       } else {
-        await apiCreateEvent(buildApiData());
+        await apiCreateEvent({ ...buildApiData(), isDraft: true });
       }
       alert('Draft saved to your dashboard.');
       navigate('/organizer');

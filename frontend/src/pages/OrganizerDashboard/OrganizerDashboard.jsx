@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiDeleteEvent, apiCreateEvent, apiPromoteEvent } from '../../services/event.service.js';
+import { apiDeleteEvent, apiCreateEvent, apiPromoteEvent, apiSubmitEvent } from '../../services/event.service.js';
 import { apiGetOrganizerStats } from '../../services/organizer.service.js';
 import { apiGetEventAttendees } from '../../services/registration.service.js';
 import { useNotifications } from '../../context/NotificationContext.jsx';
@@ -269,6 +269,18 @@ export default function OrganizerDashboard() {
     }
   }
 
+  async function submitEvent(id) {
+    const ev = events.find(e => e.id === id);
+    if (!ev) return;
+    try {
+      await apiSubmitEvent(id);
+      await loadDashboard(1);
+      showToast(`"${ev.title}" submitted for admin approval.`);
+    } catch (err) {
+      showToast(`Failed to submit event: ${err.message}`);
+    }
+  }
+
   async function doDelete() {
     if (!deleteTarget) return;
     const deletedEvent = events.find(e => e.id === deleteTarget);
@@ -420,6 +432,9 @@ export default function OrganizerDashboard() {
                         <div className="org-event-info">
                           <div style={{ marginBottom: 6 }}>
                             {(() => {
+                              if (ev.isDraft) {
+                                return <span className="badge badge-pending"><i className="ri-draft-line" /> Draft — not sent to admin</span>;
+                              }
                               const approval = ev.approvalStatus;
                               if (approval === 'PENDING') {
                                 return <span className="badge badge-pending"><i className="ri-time-line" /> Pending Approval</span>;
@@ -461,10 +476,16 @@ export default function OrganizerDashboard() {
                             <button className="btn btn-outline btn-sm" onClick={() => duplicateEvent(ev.id)}>
                               <i className="ri-file-copy-line" /> Duplicate
                             </button>
-                            <button className="btn btn-outline btn-sm" onClick={() => { setCurrentEventId(ev.id); setAttSearch(''); setAttFilter('all'); setView('attendees'); }}>
-                              <i className="ri-group-line" /> View Attendees
-                            </button>
-                            {ev.approvalStatus === 'APPROVED' && (
+                            {ev.isDraft ? (
+                              <button className="btn btn-primary btn-sm" onClick={() => submitEvent(ev.id)}>
+                                <i className="ri-send-plane-line" /> Submit for Approval
+                              </button>
+                            ) : (
+                              <button className="btn btn-outline btn-sm" onClick={() => { setCurrentEventId(ev.id); setAttSearch(''); setAttFilter('all'); setView('attendees'); }}>
+                                <i className="ri-group-line" /> View Attendees
+                              </button>
+                            )}
+                            {ev.approvalStatus === 'APPROVED' && !ev.isDraft && (
                               <button className="btn btn-outline btn-sm" onClick={() => openPromo(ev.id)}>
                                 <i className="ri-megaphone-line" /> Send Promo
                               </button>
@@ -530,6 +551,9 @@ export default function OrganizerDashboard() {
                   loading="lazy" decoding="async" onError={e => { e.currentTarget.src = '/images/Sport%20event.jpg'; }} />
                 <div style={{ marginBottom: 8 }}>
                   {(() => {
+                    if (currentEvent.isDraft) {
+                      return <span className="badge badge-pending"><i className="ri-draft-line" /> Draft — not sent to admin</span>;
+                    }
                     if (currentEvent.approvalStatus === 'PENDING') {
                       return <span className="badge badge-pending"><i className="ri-time-line" /> Pending Approval</span>;
                     }
